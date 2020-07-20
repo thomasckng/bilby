@@ -272,6 +272,105 @@ def teobresums_eccentric_binary_aligned_spins(
     return waveform
  
 
+def teobresums_eccentric_binary_aligned_spins_frequency_domain(
+        frequency_array, mass_1, mass_2, eccentricity, luminosity_distance, iota,
+        chi_1, chi_2, phase, lambda_1, lambda_2, **kwargs):
+    """ Eccentric binary black hole waveform model using TEOBResumS
+
+    Parameters
+    ----------
+    frequency_array: array_like
+        The frequencies at which we want to calculate the strain
+    mass_1: float
+        The mass of the heavier object in solar masses
+    mass_2: float
+        The mass of the lighter object in solar masses
+    eccentricity: float
+        The orbital eccentricity of the system
+    luminosity_distance: float
+        The luminosity distance in megaparsec
+    iota: float
+        Orbital inclination
+    chi_1: float
+        The dimensionless spin of the primary
+    chi_2: float
+        The dimensionless spin of the secondary
+    phase: float
+        The coalescence phase of the binary
+    lambda_1: float
+        The tidal parameter of the primary
+    lambda_2: float
+        The tidal parameter of the secondary
+    kwargs: dict
+        Optional keyword arguments
+        Supported arguments:
+            reference_frequency
+            minimum_frequency
+            maximum_frequency
+    Returns
+    -------
+    dict: A dictionary with the plus and cross polarisation strain modes (frequency domain)
+    """
+    waveform_kwargs = {'modes': [[2, 2]], 'reference_frequency': 10.0,
+                       'minimum_frequency': 10.0, 'sampling_frequency': 4096.0}
+    waveform_kwargs.update(kwargs)
+
+    k = [int(x[0]*(x[0]-1)/2 + x[1]-2) for x in waveform_kwargs['modes']]
+    parameters = {
+    'M'                  : mass_1 + mass_2,
+    'q'                  : mass_1 / mass_2,
+    'ecc'                : eccentricity,
+    'Lambda1'            : lambda_1,
+    'Lambda2'            : lambda_2,
+    'chi1'               : chi_1,
+    'chi2'               : chi_2,
+    'coalescence_angle'  : phase,
+    'domain'             : 0,	   # TD
+    'arg_out'            : 1,	   # Output hlm/hflm. Default = 0
+    'use_mode_lm'        : k,	   # List of modes to use/output through EOBRunPy
+    'srate_interp'	 : waveform_kwargs['sampling_frequency'],  # srate at which to interpolate. Default = 4096.
+    'use_geometric_units': 0,	   # Output quantities in geometric units. Default = 1
+    'initial_frequency'  : waveform_kwargs['minimum_frequency'],    # in Hz if use_geometric_units = 0, else in geometric units
+    'interp_uniform_grid': 1,	   # Interpolate mode by mode on a uniform grid. Default = 0 (no interpolation)
+    'distance'           : luminosity_distance,
+    'inclination'        : iota,
+    'output_hpc'         : 0
+    }
+
+    # Run wf generator
+    t, hplus, hcross, _ = EOBRun_module.EOBRunPy(parameters)
+    waveform_time_domain = {'plus': hplus, 'cross': hcross}
+    # Make sure the signal is the right length
+    df = frequency_array[1] - frequency_array[0]
+    duration = 1 / df
+    time_length = int(duration * kwargs['sampling_frequency'])
+    length_difference = len(waveform_time_domain['plus']) - time_length
+    if length_difference < 0:
+        # Waveform is too short; needs zero-padding
+        temp_wf = {key: np.pad(waveform_time_domain[key], (np.abs(length_difference), 0), 'constant', constant_values=(0, 0)) 
+                   for key in waveform_time_domain}
+        waveform_time_domain = temp_wf
+    elif length_difference > 0:
+        # Waveform is too long; needs cutting down to size
+        temp_wf = {key: waveform_time_domain[key][length_difference:] for key in waveform_time_domain}
+        waveform_time_domain = temp_wf
+    else:
+        pass
+    # Wrap to bring the coalescence to the end of the time series
+    coalescence_index = int(np.argmax(np.abs(waveform_time_domain['plus'] - 1j * waveform_time_domain['cross'])))
+    roll_shift = time_length - coalescence_index - 1
+    temp_wf = {key: np.roll(waveform_time_domain[key], roll_shift) for key in waveform_time_domain}
+    waveform_time_domain = temp_wf
+    
+    # Fourier transform
+    waveform = {}
+    for key in waveform_time_domain:
+        waveform[key], _ = utils.nfft(waveform_time_domain[key], kwargs['sampling_frequency'])
+
+    # Return waveform 
+    return waveform
+
+
 def lal_eccentric_binary_black_hole_no_spins(
         frequency_array, mass_1, mass_2, eccentricity, luminosity_distance,
         theta_jn, phase, **kwargs):
