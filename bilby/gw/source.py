@@ -184,7 +184,7 @@ def lal_binary_neutron_star(
 
 def teobresums_eccentric_binary_aligned_spins(
         time_array, mass_1, mass_2, eccentricity, luminosity_distance, iota,
-        chi_1, chi_2, lambda_1, lambda_2, **kwargs):
+        chi_1, chi_2, phase, lambda_1, lambda_2, **kwargs):
     """ Eccentric binary black hole waveform model using TEOBResumS
 
     Parameters
@@ -205,10 +205,12 @@ def teobresums_eccentric_binary_aligned_spins(
         The dimensionless spin of the primary
     chi_2: float
         The dimensionless spin of the secondary
+    phase: float
+        The coalescence phase of the binary
     lambda_1: float
-        The ? of the primary
+        The tidal parameter of the primary
     lambda_2: float
-        The ? of the secondary
+        The tidal parameter of the secondary
     kwargs: dict
         Optional keyword arguments
         Supported arguments:
@@ -232,6 +234,7 @@ def teobresums_eccentric_binary_aligned_spins(
     'Lambda2'            : lambda_2,     
     'chi1'               : chi_1,
     'chi2'               : chi_2,
+    'coalescence_angle'  : phase,
     'domain'             : 0,      # TD
     'arg_out'            : 1,      # Output hlm/hflm. Default = 0
     'use_mode_lm'        : k,      # List of modes to use/output through EOBRunPy
