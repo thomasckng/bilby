@@ -727,7 +727,11 @@ def sample_rwalk_bilby(args):
     walks = kwargs.get('walks', 25)  # minimum number of steps
     maxmcmc = kwargs.get('maxmcmc', 2000)  # Maximum number of steps
     nact = kwargs.get('nact', 5)  # Number of ACT
-    old_act = kwargs.get('old_act', walks/nact) # In the absence of any other information, the first live point replacement will have `walks` iterations
+
+    # In the absence of any other information, the first live point replacement
+    # will have `walks` iterations
+    old_act = kwargs.get('old_act', walks / nact)
+
     adapt_tscale = kwargs.get('adapt_tscale', 100)
 
     # Initialize internal variables
@@ -737,7 +741,7 @@ def sample_rwalk_bilby(args):
     v = prior_transform(u)
     logl = loglikelihood(np.array(v))
 
-    for ii in range(round(nact*old_act)+1): # +1 to ensure at least one iteration no matter what
+    for ii in range(round(nact * old_act) + 1): # +1 to ensure at least one iteration no matter what
         # Propose a direction on the unit n-sphere.
         drhat = rstate.randn(n)
         drhat /= np.linalg.norm(drhat)
@@ -792,6 +796,7 @@ def sample_rwalk_bilby(args):
     ncall = accept + reject + nfail
     return u, v, logl, ncall, blob
 
+
 def estimate_act(accept, reject, nfail, old_act, adapt_tscale):
 
     """Estimate the autocorrelation time of a chain, and compute a running
@@ -799,10 +804,14 @@ def estimate_act(accept, reject, nfail, old_act, adapt_tscale):
     `adapt_tscale`."""
 
     nstep = accept + reject + nfail
-    p_acc = max(accept / nstep, 0.5 / nstep) # if accept = 0, assume acceptance after 2*nstep
 
-    act_est = 2/p_acc - 1
-    return old_act*(1-1/adapt_tscale) + act_est/adapt_tscale
+    # if accept = 0, put half a count (this will cause the estimated act to be
+    # 4 times as long as the current run)
+    p_acc = max(accept / nstep, 0.5 / nstep)
+
+    act_est = 2 / p_acc - 1
+    return old_act * (1 - 1 / adapt_tscale) + act_est / adapt_tscale
+
 
 class DynestySetupError(Exception):
     pass

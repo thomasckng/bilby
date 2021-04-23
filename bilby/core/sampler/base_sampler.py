@@ -566,7 +566,7 @@ class NestedSampler(Sampler):
         for ii in range(len(unsorted_loglikelihoods)):
             idx = np.where(np.all(sorted_samples[ii] == unsorted_samples,
                                   axis=1))[0]
-            idxs.append(idx[0]) # Take the first sample from equal likelihoods.
+            idxs.append(idx[0])  # Take the first sample from equal likelihoods.
         return unsorted_loglikelihoods[idxs]
 
     def log_likelihood(self, theta):
