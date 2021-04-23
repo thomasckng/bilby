@@ -55,15 +55,17 @@ can see exact details by looking at the function
 took an argument :code:`walks` which was the fixed number of walks to take each
 time a new point was proposed. In the bilby implementation, we still take an
 argument :code:`walks` which has the new meaning: the minimum number of walks
-to take (this ensures backward compatibility). Meanwhile, we add two new
+to take (this ensures backward compatibility). Meanwhile, we add three new
 arguments
 
 1. :code:`maxmcmc`: the maximum number of walks to use. This naming is chosen for consistency with other codes. Default is 5000. If this limit is reached, a warning will be printed during sampling.
 
 2. :code:`nact`: the number of auto-correlation times to use before accepting a point.
 
+3. :code:`adapt_tscale`: the number of live point updates over which the running mean estimate of the auto-correlation time averages.  Default is 100, which is a good compromise between stability of the estimate and adapting to the changing constrained prior as the sampling progresses.
+
 In general, poor convergance can be resolved by increasing :code:`nact`. For GW
-events, we find a value of 10 is typically okay.  You can revert to the
+events, we find a value of 1 to few is typically okay.  You can revert to the
 original dynesty implementation by specifying :code:`sample="rwalk_dynesty"`.
 
 Understanding the output
