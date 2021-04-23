@@ -65,7 +65,8 @@ class TestDynesty(unittest.TestCase):
             print_func="func",
             n_effective=None,
             maxmcmc=5000,
-            nact=5,
+            nact=1,
+            adapt_tscale=100
         )
         self.sampler.kwargs[
             "print_func"
@@ -121,7 +122,8 @@ class TestDynesty(unittest.TestCase):
             print_func="func",
             n_effective=None,
             maxmcmc=5000,
-            nact=5,
+            nact=1,
+            adapt_tscale=100
         )
 
         for equiv in bilby.core.sampler.base_sampler.NestedSampler.npoints_equiv_kwargs:
