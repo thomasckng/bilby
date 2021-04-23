@@ -741,7 +741,8 @@ def sample_rwalk_bilby(args):
     v = prior_transform(u)
     logl = loglikelihood(np.array(v))
 
-    for ii in range(round(nact * old_act) + 1): # +1 to ensure at least one iteration no matter what
+    # +1 to ensure at least one iteration no matter what
+    for ii in range(round(nact * old_act) + 1):
         # Propose a direction on the unit n-sphere.
         drhat = rstate.randn(n)
         drhat /= np.linalg.norm(drhat)
