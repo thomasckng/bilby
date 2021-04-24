@@ -791,7 +791,7 @@ def sample_rwalk_bilby(args):
 
     act = estimate_act(accept, reject, nfail, old_act, adapt_tscale)
 
-    blob = {'accept': accept, 'reject': reject, 'fail': nfail, 'scale': scale}
+    blob = {'accept': accept, 'reject': reject+nfail, 'fail': nfail, 'scale': scale}
     kwargs["old_act"] = act
 
     ncall = accept + reject + nfail
