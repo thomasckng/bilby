@@ -751,9 +751,7 @@ def sample_rwalk_bilby(args):
         # Propose a direction on the unit n-sphere.
         drhat = rstate.randn(n)
         drhat /= np.linalg.norm(drhat)
-
-        # Scale based on dimensionality.
-        dr = drhat * rstate.rand() ** (1.0 / n)
+        dr = drhat * rstate.randn()
 
         # Transform to proposal distribution.
         du = np.dot(axes, dr)
