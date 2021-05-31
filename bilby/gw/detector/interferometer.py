@@ -271,8 +271,23 @@ class Interferometer(object):
         array_like: A 3x3 array representation of the antenna response for the specified mode
 
         """
+        import lal
+        import lalsimulation
+        gmst = lal.GreenwichMeanSiderealTime(time)
+        fplus, fcross = lal.ComputeDetAMResponse(
+            lalsimulation.DetectorPrefixToLALDetector(self.name).response, ra, dec, psi, gmst)
+        if mode == 'plus':
+            return fplus
+        elif mode == 'cross':
+            return fcross
+        else:
+            raise ValueError
+
+
+    def antenna_response_old(self, ra, dec, time, psi, mode):
         polarization_tensor = gwutils.get_polarization_tensor(ra, dec, time, psi, mode)
         return np.einsum('ij,ij->', self.geometry.detector_tensor, polarization_tensor)
+
 
     def get_detector_response(self, waveform_polarizations, parameters):
         """ Get the detector response for a particular waveform
