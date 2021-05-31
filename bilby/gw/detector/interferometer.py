@@ -283,11 +283,9 @@ class Interferometer(object):
         else:
             raise ValueError
 
-
     def antenna_response_old(self, ra, dec, time, psi, mode):
         polarization_tensor = gwutils.get_polarization_tensor(ra, dec, time, psi, mode)
         return np.einsum('ij,ij->', self.geometry.detector_tensor, polarization_tensor)
-
 
     def get_detector_response(self, waveform_polarizations, parameters):
         """ Get the detector response for a particular waveform
