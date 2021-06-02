@@ -10,6 +10,8 @@ from .calibration import Recalibrate
 from .geometry import InterferometerGeometry
 from .strain_data import InterferometerStrainData
 
+_VALID_MODES_DICT = dict(plus=0, cross=1, breathing=2, longitudinal=3, x=4, y=5)
+
 
 class Interferometer(object):
     """Class for the Interferometer """
@@ -272,16 +274,15 @@ class Interferometer(object):
 
         """
         import lal
-        import lalsimulation
         gmst = lal.GreenwichMeanSiderealTime(time)
-        fplus, fcross = lal.ComputeDetAMResponse(
-            lalsimulation.DetectorPrefixToLALDetector(self.name).response, ra, dec, psi, gmst)
-        if mode == 'plus':
-            return fplus
-        elif mode == 'cross':
-            return fcross
-        else:
-            raise ValueError
+        response_modes = lal.ComputeDetAMResponseExtraModes(
+            self.geometry.detector_tensor, ra, dec, psi, gmst)
+        return response_modes[_VALID_MODES_DICT[mode]]
+
+    def antenna_response_plus_cross(self, ra, dec, time, psi):
+        import lal
+        gmst = lal.GreenwichMeanSiderealTime(time)
+        return lal.ComputeDetAMResponse(self.geometry.detector_tensor, ra, dec, psi, gmst)
 
     def antenna_response_old(self, ra, dec, time, psi, mode):
         polarization_tensor = gwutils.get_polarization_tensor(ra, dec, time, psi, mode)
@@ -302,16 +303,25 @@ class Interferometer(object):
         array_like: A 3x3 array representation of the detector response (signal observed in the interferometer)
         """
         signal = {}
-        for mode in waveform_polarizations.keys():
-            det_response = self.antenna_response(
+        if sorted(list(waveform_polarizations.keys())) == ['cross', 'plus']:
+            det_response_plus, det_response_cross = self.antenna_response_plus_cross(
                 parameters['ra'],
                 parameters['dec'],
                 parameters['geocent_time'],
-                parameters['psi'], mode)
+                parameters['psi'])
+            signal['plus'] = waveform_polarizations['plus'] * det_response_plus
+            signal['cross'] = waveform_polarizations['cross'] * det_response_cross
+        else:
+            for mode in waveform_polarizations.keys():
+                det_response = self.antenna_response(
+                    parameters['ra'],
+                    parameters['dec'],
+                    parameters['geocent_time'],
+                    parameters['psi'], mode)
 
-            signal[mode] = waveform_polarizations[mode] * det_response
+                signal[mode] = waveform_polarizations[mode] * det_response
+
         signal_ifo = sum(signal.values())
-
         signal_ifo *= self.strain_data.frequency_mask
 
         time_shift = self.time_delay_from_geocenter(

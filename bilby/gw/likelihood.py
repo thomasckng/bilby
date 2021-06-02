@@ -1318,12 +1318,9 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
 
         """
 
-        f_plus = interferometer.antenna_response(
+        f_plus, f_cross = interferometer.antenna_response_plus_cross(
             self.parameters['ra'], self.parameters['dec'],
-            self.parameters['geocent_time'], self.parameters['psi'], 'plus')
-        f_cross = interferometer.antenna_response(
-            self.parameters['ra'], self.parameters['dec'],
-            self.parameters['geocent_time'], self.parameters['psi'], 'cross')
+            self.parameters['geocent_time'], self.parameters['psi'])
 
         dt = interferometer.time_delay_from_geocenter(
             self.parameters['ra'], self.parameters['dec'],
