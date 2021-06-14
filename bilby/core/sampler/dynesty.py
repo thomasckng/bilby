@@ -21,6 +21,7 @@ _likelihood = None
 _priors = None
 _search_parameter_keys = None
 _use_ratio = False
+_act = np.nan
 
 
 def _initialize_global_variables(
@@ -728,6 +729,7 @@ class Dynesty(NestedSampler):
 def sample_rwalk_bilby(args):
     """ Modified bilby-implemented version of dynesty.sampling.sample_rwalk """
     from dynesty.utils import unitcheck
+    global _act
 
     # Unzipping.
     (u, loglstar, axes, scale,
@@ -747,7 +749,11 @@ def sample_rwalk_bilby(args):
 
     # In the absence of any other information, the first live point replacement
     # will have `walks` iterations
-    old_act = kwargs.get('old_act', walks / nact)
+    if np.isnan(_act):
+        old_act = walks / nact
+    else:
+        old_act = _act
+    nsteps = max(min(round(nact * old_act), maxmcmc), 1)
 
     adapt_tscale = kwargs.get('adapt_tscale', 100)
 
@@ -758,8 +764,7 @@ def sample_rwalk_bilby(args):
     v = prior_transform(u)
     logl = loglikelihood(np.array(v))
 
-    # +1 to ensure at least one iteration no matter what
-    for ii in range(round(nact * old_act) + 1):
+    for ii in range(nsteps):
         # Propose a direction on the unit n-sphere.
         drhat = rstate.randn(n)
         drhat /= np.linalg.norm(drhat)
@@ -800,19 +805,23 @@ def sample_rwalk_bilby(args):
             # No updates to u, v, logl
 
     # If we've taken too many likelihood evaluations then break
-    if accept == 0 and accept + reject == maxmcmc:
-        warnings.warn(
-            "No accepted MCMC steps after {} proposals.  "
-            "If this warning occurs often, try increasing maxmcmc "
-            "or reparameterizing for better sampling efficiency".format(maxmcmc))
+    if accept == 0:
+        if nsteps == maxmcmc:
+            warnings.warn(
+                f"No accepted MCMC steps after {maxmcmc} proposals.  "
+                "If this warning occurs often, try increasing maxmcmc "
+                "or reparameterizing for better sampling efficiency"
+            )
+        logger.debug("Unable to find a new point using walk: returning a random point")
+        u = np.random.uniform(size=n)
+        v = prior_transform(u)
+        logl = loglikelihood(v)
 
-    act = estimate_act(accept, reject, nfail, old_act, adapt_tscale)
+    _act = estimate_act(accept, reject, nfail, old_act, adapt_tscale)
 
     blob = {'accept': accept, 'reject': reject + nfail, 'fail': nfail, 'scale': scale}
-    kwargs["old_act"] = act
 
-    ncall = accept + reject + nfail
-    return u, v, logl, ncall, blob
+    return u, v, logl, nsteps, blob
 
 
 def estimate_act(accept, reject, nfail, old_act, adapt_tscale):
