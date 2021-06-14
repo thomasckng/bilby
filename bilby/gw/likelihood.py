@@ -62,6 +62,8 @@ class GravitationalWaveTransient(Likelihood):
         This is done numerically over a number of calibration response curve realizations.
     priors: dict, optional
         If given, used in the distance and phase marginalization.
+        Warning: when using marginalisation the dict is overwritten which will change the
+        the dict you are passing in. If this behaviour is undesired, pass `priors.copy()`.
     distance_marginalization_lookup_table: (dict, str), optional
         If a dict, dictionary containing the lookup_table, distance_array,
         (distance) prior_array, and reference_distance used to construct
@@ -123,7 +125,7 @@ class GravitationalWaveTransient(Likelihood):
     def __init__(
         self, interferometers, waveform_generator, time_marginalization=False,
         distance_marginalization=False, phase_marginalization=False, calibration_marginalization=False, priors=None,
-        distance_marginalization_lookup_table=None, calibration_lookup_table={},
+        distance_marginalization_lookup_table=None, calibration_lookup_table=None,
         number_of_response_curves=1000, starting_index=0, jitter_time=True, reference_frame="sky",
         time_reference="geocenter"
     ):
@@ -261,7 +263,6 @@ class GravitationalWaveTransient(Likelihood):
         if self.time_marginalization and self.calibration_marginalization:
 
             d_inner_h_integrand = np.tile(
-                4. / self.waveform_generator.duration *
                 interferometer.frequency_domain_strain.conjugate() * signal /
                 interferometer.power_spectral_density_array, (self.number_of_response_curves, 1)).T
 
@@ -553,10 +554,10 @@ class GravitationalWaveTransient(Likelihood):
         times = times[in_prior]
 
         n_time_steps = int(self.waveform_generator.duration * 16384)
-        d_inner_h = np.zeros(len(times), dtype=np.complex)
+        d_inner_h = np.zeros(len(times), dtype=complex)
         psd = np.ones(n_time_steps)
-        signal_long = np.zeros(n_time_steps, dtype=np.complex)
-        data = np.zeros(n_time_steps, dtype=np.complex)
+        signal_long = np.zeros(n_time_steps, dtype=complex)
+        data = np.zeros(n_time_steps, dtype=complex)
         h_inner_h = np.zeros(1)
         for ifo in self.interferometers:
             ifo_length = len(ifo.frequency_domain_strain)
@@ -912,24 +913,29 @@ class GravitationalWaveTransient(Likelihood):
 
     def _create_lookup_table(self):
         """ Make the lookup table """
+        from tqdm.auto import tqdm
         logger.info('Building lookup table for distance marginalisation.')
 
         self._dist_margd_loglikelihood_array = np.zeros((400, 800))
-        for ii, optimal_snr_squared_ref in enumerate(self._optimal_snr_squared_ref_array):
-            optimal_snr_squared_array = (
-                optimal_snr_squared_ref * self._ref_dist ** 2. /
-                self._distance_array ** 2)
-            for jj, d_inner_h_ref in enumerate(self._d_inner_h_ref_array):
-                d_inner_h_array = (
-                    d_inner_h_ref * self._ref_dist / self._distance_array)
-                if self.phase_marginalization:
-                    d_inner_h_array =\
-                        self._bessel_function_interped(abs(d_inner_h_array))
-                self._dist_margd_loglikelihood_array[ii][jj] = \
-                    logsumexp(d_inner_h_array - optimal_snr_squared_array / 2,
-                              b=self.distance_prior_array * self._delta_distance)
-        log_norm = logsumexp(0. / self._distance_array,
-                             b=self.distance_prior_array * self._delta_distance)
+        scaling = self._ref_dist / self._distance_array
+        d_inner_h_array_full = np.outer(self._d_inner_h_ref_array, scaling)
+        h_inner_h_array_full = np.outer(self._optimal_snr_squared_ref_array, scaling ** 2)
+        if self.phase_marginalization:
+            d_inner_h_array_full = self._bessel_function_interped(abs(
+                d_inner_h_array_full
+            ))
+        prior_term = self.distance_prior_array * self._delta_distance
+        for ii, optimal_snr_squared_array in tqdm(
+            enumerate(h_inner_h_array_full), total=len(self._optimal_snr_squared_ref_array)
+        ):
+            for jj, d_inner_h_array in enumerate(d_inner_h_array_full):
+                self._dist_margd_loglikelihood_array[ii][jj] = logsumexp(
+                    d_inner_h_array - optimal_snr_squared_array / 2,
+                    b=prior_term
+                )
+        log_norm = logsumexp(
+            0 / self._distance_array, b=self.distance_prior_array * self._delta_distance
+        )
         self._dist_margd_loglikelihood_array -= log_norm
         self.cache_lookup_table()
 
@@ -951,6 +957,8 @@ class GravitationalWaveTransient(Likelihood):
             self.priors['geocent_time'].prob(self._times) * self._delta_tc
 
     def _setup_calibration_marginalization(self, calibration_lookup_table):
+        if calibration_lookup_table is None:
+            calibration_lookup_table = {}
         self.calibration_draws = {}
         self.calibration_abs_draws = {}
         self.calibration_parameter_draws = {}
@@ -1223,6 +1231,8 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
         The ROQ scale factor used.
     priors: dict, bilby.prior.PriorDict
         A dictionary of priors containing at least the geocent_time prior
+        Warning: when using marginalisation the dict is overwritten which will change the
+        the dict you are passing in. If this behaviour is undesired, pass `priors.copy()`.
     distance_marginalization_lookup_table: (dict, str), optional
         If a dict, dictionary containing the lookup_table, distance_array,
         (distance) prior_array, and reference_distance used to construct
@@ -1487,9 +1497,9 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
             ifft = np.fft.ifft
         # Maximum delay time to geocentre + 5 steps
         earth_light_crossing_time = radius_of_earth / speed_of_light + 5 * time_space
-        start_idx = max(0, np.int(np.floor((self.priors['{}_time'.format(self.time_reference)].minimum -
+        start_idx = max(0, int(np.floor((self.priors['{}_time'.format(self.time_reference)].minimum -
                         earth_light_crossing_time - self.interferometers.start_time) / time_space)))
-        end_idx = min(number_of_time_samples - 1, np.int(np.ceil((
+        end_idx = min(number_of_time_samples - 1, int(np.ceil((
                       self.priors['{}_time'.format(self.time_reference)].maximum + earth_light_crossing_time -
                       self.interferometers.start_time) / time_space)))
         self.weights['time_samples'] = np.arange(start_idx, end_idx + 1) * time_space
@@ -1620,7 +1630,7 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
 
         inj_snr_sq = 0
         for ifo in self.interferometers:
-            inj_snr_sq += min(10, getattr(ifo.meta_data, 'optimal_SNR', 30))**2
+            inj_snr_sq += max(10, ifo.meta_data.get('optimal_SNR', 30))**2
 
         psd = ifo.power_spectral_density_array[ifo.frequency_mask]
         freq = ifo.frequency_array[ifo.frequency_mask]
@@ -1635,7 +1645,7 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
         number_of_time_samples = max(
             self.interferometers.duration / delta_t,
             self.interferometers.frequency_array[-1] * self.interferometers.duration + 1)
-        number_of_time_samples = np.int(2**np.ceil(np.log2(number_of_time_samples)))
+        number_of_time_samples = int(2**np.ceil(np.log2(number_of_time_samples)))
         delta_t = self.interferometers.duration / number_of_time_samples
         logger.info("ROQ time-step = {}".format(delta_t))
         return delta_t

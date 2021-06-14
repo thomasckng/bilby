@@ -5,11 +5,11 @@ import subprocess
 import sys
 import os
 
-# check that python version is 3.5 or above
+# check that python version is 3.6 or above
 python_version = sys.version_info
-if python_version < (3, 5):
-    sys.exit("Python < 3.5 is not supported, aborting setup")
-print("Confirmed Python version {}.{}.{} >= 3.5.0".format(*python_version[:3]))
+if python_version < (3, 6):
+    sys.exit("Python < 3.6 is not supported, aborting setup")
+print("Confirmed Python version {}.{}.{} >= 3.6.0".format(*python_version[:3]))
 
 
 def write_version_file(version):
@@ -70,7 +70,7 @@ def readfile(filename):
     return filecontents
 
 
-VERSION = '1.1.1'
+VERSION = '1.1.2'
 version_file = write_version_file(VERSION)
 long_description = get_long_description()
 
@@ -84,14 +84,14 @@ setup(name='bilby',
       license="MIT",
       version=VERSION,
       packages=['bilby', 'bilby.core', 'bilby.core.prior', 'bilby.core.sampler',
-                'bilby.gw', 'bilby.gw.detector', 'bilby.gw.sampler',
-                'bilby.hyper', 'bilby.gw.eos', 'cli_bilby'],
+                'bilby.core.utils', 'bilby.gw', 'bilby.gw.detector',
+                'bilby.gw.sampler', 'bilby.hyper', 'bilby.gw.eos', 'cli_bilby'],
       package_dir={'bilby': 'bilby', 'cli_bilby': 'cli_bilby'},
       package_data={'bilby.gw': ['prior_files/*'],
                     'bilby.gw.detector': ['noise_curves/*.txt', 'detectors/*'],
                     'bilby.gw.eos': ['eos_tables/*.dat'],
                     'bilby': [version_file]},
-      python_requires='>=3.5',
+      python_requires='>=3.6',
       install_requires=get_requirements(),
       entry_points={'console_scripts':
                     ['bilby_plot=cli_bilby.plot_multiple_posteriors:main',
