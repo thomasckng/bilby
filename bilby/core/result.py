@@ -689,6 +689,14 @@ class Result(object):
         return self.log_noise_evidence / np.log(10)
 
     @property
+    def maximum_likelihood_parameters(self):
+        return self.posterior.iloc[-1]
+
+    @property
+    def maximum_log_likelihood(self):
+        return self.maximum_likelihood_parameters['log_likelihood']
+
+    @property
     def version(self):
         return self._version
 
