@@ -3,6 +3,8 @@ from __future__ import division, print_function
 import numpy as np
 import EOBRun_module
 
+from scipy import signal
+
 from ..core import utils
 from ..core.utils import logger
 from .conversion import bilby_to_lalsimulation_spins
@@ -20,6 +22,7 @@ except ImportError:
     logger.debug("You do not have lalsuite installed currently. You will"
                  " not be able to use some of the prebuilt functions.")
 
+roll_off = 1
 
 def lal_binary_black_hole(
         frequency_array, mass_1, mass_2, luminosity_distance, a_1, tilt_1,
@@ -248,11 +251,17 @@ def teobresums_eccentric_binary_aligned_spins(
     }
 
     # Run wf generator
-    t, hplus, hcross, _ = EOBRun_module.EOBRunPy(parameters)
+    t, hplus, hcross, hlm, dyn = EOBRun_module.EOBRunPy(parameters)
     waveform = {'plus': hplus, 'cross': hcross}
     # Make sure the signal is the right length
     time_length = len(time_array)
     length_difference = len(waveform['plus']) - time_length
+    # Apply a Tukey window
+    alpha = roll_off / waveform_kwargs['duration']
+    window = signal.tukey(len(waveform['plus']), alpha)
+    # Custom window - avoid cutting off the merger and ringdown
+    window[int(len(waveform['plus'])/2)::] = 1
+    waveform = {key: waveform[key] * window for key in waveform}
     if length_difference < 0:
         # Waveform is too short; needs zero-padding
         temp_wf = {key: np.pad(waveform[key], (np.abs(length_difference), 0), 'constant', constant_values=(0, 0)) for key in waveform}
@@ -338,13 +347,19 @@ def teobresums_eccentric_binary_aligned_spins_frequency_domain(
     }
 
     # Run wf generator
-    t, hplus, hcross, _ = EOBRun_module.EOBRunPy(parameters)
+    t, hplus, hcross, hlm, dyn = EOBRun_module.EOBRunPy(parameters)
     waveform_time_domain = {'plus': hplus, 'cross': hcross}
     # Make sure the signal is the right length
     df = frequency_array[1] - frequency_array[0]
     duration = 1 / df
     time_length = int(duration * kwargs['sampling_frequency'])
     length_difference = len(waveform_time_domain['plus']) - time_length
+    # Apply a Tukey window
+    alpha = roll_off / waveform_kwargs['duration']
+    window = signal.tukey(len(waveform_time_domain['plus']), alpha)
+    # Custom window - avoid cutting off the merger and ringdown
+    window[int(len(waveform_time_domain['plus'])/2)::] = 1
+    waveform_time_domain = {key: waveform_time_domain[key] * window for key in waveform_time_domain}
     if length_difference < 0:
         # Waveform is too short; needs zero-padding
         temp_wf = {key: np.pad(waveform_time_domain[key], (np.abs(length_difference), 0), 'constant', constant_values=(0, 0)) 
