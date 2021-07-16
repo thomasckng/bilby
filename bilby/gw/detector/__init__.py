@@ -5,63 +5,71 @@ from .networks import *
 from .psd import *
 from .strain_data import *
 
-try:
-    import lal
-    import lalsimulation as lalsim
-except ImportError:
-    logger.debug("You do not have lalsuite installed currently. You will"
-                 " not be able to use some of the prebuilt functions.")
-
-
 def get_safe_signal_duration(mass_1, mass_2, a_1, a_2, tilt_1, tilt_2, flow=10):
     """ Calculate the safe signal duration, given the parameters
 
     Parameters
-    ----------
+    ==========
     mass_1, mass_2, a_1, a_2, tilt_1, tilt_2: float
         The signal parameters
     flow: float
         The lower frequency cutoff from which to calculate the signal duration
 
      Returns
-     -------
+     =======
      safe_signal_duration: float
         The shortest safe signal duration (i.e., the signal duration rounded up
         to the nearest power of 2)
 
     """
-    chirp_time = lalsim.SimInspiralChirpTimeBound(
-        flow, mass_1 * lal.MSUN_SI, mass_2 * lal.MSUN_SI,
+    from lal import MSUN_SI
+    from lalsimulation import SimInspiralChirpTimeBound
+    chirp_time = SimInspiralChirpTimeBound(
+        flow, mass_1 * MSUN_SI, mass_2 * MSUN_SI,
         a_1 * np.cos(tilt_1), a_2 * np.cos(tilt_2))
     return max(2**(int(np.log2(chirp_time)) + 1), 4)
 
 
 def inject_signal_into_gwpy_timeseries(
-        data, waveform_generator, parameters, det, outdir=None, label=None):
+        data, waveform_generator, parameters, det, power_spectral_density=None, outdir=None, label=None):
     """ Inject a signal into a gwpy timeseries
 
     Parameters
-    ----------
+    ==========
     data: gwpy.timeseries.TimeSeries
         The time-series data into which we want to inject the signal
     waveform_generator: bilby.gw.waveform_generator.WaveformGenerator
         An initialised waveform_generator
     parameters: dict
         A dictionary of the signal-parameters to inject
-    ifo: bilby.gw.detector.Interferometer
+    det: bilby.gw.detector.Interferometer
         The interferometer for which the data refers too
+    power_spectral_density: bilby.gw.detector.PowerSpectralDensity
+        Power spectral density determining the sensitivity of the detector.
     outdir, label: str
         If given, the outdir and label used to generate a plot
 
     Returns
-    -------
+    =======
     data_and_signal: gwpy.timeseries.TimeSeries
         The data with the time-domain signal added
     meta_data: dict
         A dictionary of meta data about the injection
 
     """
+    from gwpy.timeseries import TimeSeries
+    from gwpy.plot import Plot
+
     ifo = get_empty_interferometer(det)
+
+    if isinstance(power_spectral_density, PowerSpectralDensity):
+        ifo.power_spectral_density = power_spectral_density
+    elif power_spectral_density is not None:
+        raise TypeError(
+            "Input power_spectral_density should be bilby.gw.detector.psd.PowerSpectralDensity "
+            "object or None, received {}.".format(type(power_spectral_density))
+        )
+
     ifo.strain_data.set_from_gwpy_timeseries(data)
 
     parameters_check, _ = convert_to_lal_binary_black_hole_parameters(parameters)
@@ -88,13 +96,13 @@ def inject_signal_into_gwpy_timeseries(
     dt = parameters['geocent_time'] + time_shift - data.times[0].value
     n_roll = dt * data.sample_rate.value
     n_roll = int(np.round(n_roll))
-    signal_shifted = gwpy.timeseries.TimeSeries(
+    signal_shifted = TimeSeries(
         data=np.roll(signal, n_roll), times=data.times, unit=data.unit)
 
     signal_and_data = data.inject(signal_shifted)
 
     if outdir is not None and label is not None:
-        fig = gwpy.plot.Plot(signal_shifted)
+        fig = Plot(signal_shifted)
         fig.savefig('{}/{}_{}_time_domain_injected_signal'.format(
             outdir, ifo.name, label))
 
@@ -128,7 +136,7 @@ def get_interferometer_with_fake_noise_and_injection(
     density based on advanced LIGO.
 
     Parameters
-    ----------
+    ==========
     name: str
         Detector name, e.g., 'H1'.
     injection_parameters: dict
@@ -160,7 +168,7 @@ def get_interferometer_with_fake_noise_and_injection(
         If true, set noise to zero.
 
     Returns
-    -------
+    =======
     bilby.gw.detector.Interferometer: An Interferometer instance with a PSD and frequency-domain strain data.
 
     """
@@ -205,7 +213,7 @@ def load_data_from_cache_file(
     """ Helper routine to generate an interferometer from a cache file
 
     Parameters
-    ----------
+    ==========
     cache_file: str
         Path to the location of the cache file
     start_time, psd_start_time: float
@@ -225,7 +233,7 @@ def load_data_from_cache_file(
         The output directory in which the data is saved
 
     Returns
-    -------
+    =======
     ifo: bilby.gw.detector.Interferometer
         An initialised interferometer object with strain data set to the
         appropriate data in the cache file and a PSD.
@@ -299,7 +307,7 @@ def load_data_by_channel_name(
     the specified channel using gwpy.TimeSeries.get()
 
     Parameters
-    ----------
+    ==========
     channel_name: str
         Channel name with the format `IFO:Channel`
     start_time, psd_start_time: float
@@ -317,7 +325,7 @@ def load_data_by_channel_name(
         The output directory in which the data is saved
 
     Returns
-    -------
+    =======
     ifo: bilby.gw.detector.Interferometer
         An initialised interferometer object with strain data set to the
         appropriate data fetched from the specified channel and a PSD.
@@ -329,7 +337,7 @@ def load_data_by_channel_name(
     ifo = get_empty_interferometer(det)
 
     ifo.set_strain_data_from_channel_name(
-        channel = channel_name,
+        channel=channel_name,
         sampling_frequency=sampling_frequency,
         duration=segment_duration,
         start_time=start_time)

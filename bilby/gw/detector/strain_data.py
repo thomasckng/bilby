@@ -1,24 +1,9 @@
 import numpy as np
-from scipy.signal.windows import tukey
 
 from ...core import utils
 from ...core.series import CoupledTimeAndFrequencySeries
-from ...core.utils import logger
+from ...core.utils import logger, PropertyAccessor
 from .. import utils as gwutils
-from ..utils import PropertyAccessor
-
-try:
-    import gwpy
-    import gwpy.signal
-except ImportError:
-    logger.debug("You do not have gwpy installed currently. You will "
-                 " not be able to use some of the prebuilt functions.")
-
-try:
-    import lal
-except ImportError:
-    logger.debug("You do not have lalsuite installed currently. You will"
-                 " not be able to use some of the prebuilt functions.")
 
 
 class InterferometerStrainData(object):
@@ -31,14 +16,14 @@ class InterferometerStrainData(object):
     time_array = PropertyAccessor('_times_and_frequencies', 'time_array')
 
     def __init__(self, minimum_frequency=0, maximum_frequency=np.inf,
-                 roll_off=0.2):
+                 roll_off=0.2, notch_list=None):
         """ Initiate an InterferometerStrainData object
 
         The initialised object contains no data, this should be added using one
         of the `set_from..` methods.
 
         Parameters
-        ----------
+        ==========
         minimum_frequency: float
             Minimum frequency to analyse for detector. Default is 0.
         maximum_frequency: float
@@ -46,11 +31,14 @@ class InterferometerStrainData(object):
         roll_off: float
             The roll-off (in seconds) used in the Tukey window, default=0.2s.
             This corresponds to alpha * duration / 2 for scipy tukey window.
+        notch_list: bilby.gw.detector.strain_data.NotchList
+            A list of notches
 
         """
 
         self.minimum_frequency = minimum_frequency
         self.maximum_frequency = maximum_frequency
+        self.notch_list = notch_list
         self.roll_off = roll_off
         self.window_factor = 1
 
@@ -81,12 +69,12 @@ class InterferometerStrainData(object):
         """ Check if time is within the data span
 
         Parameters
-        ----------
+        ==========
         time: float
             The time to check
 
         Returns
-        -------
+        =======
         bool:
             A boolean stating whether the time is inside or outside the span
 
@@ -123,17 +111,45 @@ class InterferometerStrainData(object):
         self._frequency_mask_updated = False
 
     @property
+    def notch_list(self):
+        return self._notch_list
+
+    @notch_list.setter
+    def notch_list(self, notch_list):
+        """ Set the notch_list
+
+        Parameters
+        ==========
+        notch_list: list, bilby.gw.detector.strain_data.NotchList
+            A list of length-2 tuples of the (max, min) frequency for the
+            notches or a pre-made bilby NotchList.
+
+        """
+        if notch_list is None:
+            self._notch_list = NotchList(None)
+        elif isinstance(notch_list, list):
+            self._notch_list = NotchList(notch_list)
+        elif isinstance(notch_list, NotchList):
+            self._notch_list = notch_list
+        else:
+            raise ValueError("notch_list {} not understood".format(notch_list))
+        self._frequency_mask_updated = False
+
+    @property
     def frequency_mask(self):
-        """Masking array for limiting the frequency band.
+        """ Masking array for limiting the frequency band.
 
         Returns
-        -------
-        array_like: An array of boolean values
+        =======
+        mask: np.ndarray
+            An array of boolean values
         """
         if not self._frequency_mask_updated:
             frequency_array = self._times_and_frequencies.frequency_array
             mask = ((frequency_array >= self.minimum_frequency) &
                     (frequency_array <= self.maximum_frequency))
+            for notch in self.notch_list:
+                mask[notch.get_idxs(frequency_array)] = False
             self._frequency_mask = mask
             self._frequency_mask_updated = True
         return self._frequency_mask
@@ -155,18 +171,19 @@ class InterferometerStrainData(object):
         See https://dcc.ligo.org/DocDB/0027/T040089/000/T040089-00.pdf
 
         Parameters
-        ----------
+        ==========
         roll_off: float
             Rise time of window in seconds
         alpha: float
             Parameter to pass to tukey window, how much of segment falls
             into windowed part
 
-        Return
-        ------
+        Returns
+        ======
         window: array
             Window function over time array
         """
+        from scipy.signal.windows import tukey
         if roll_off is not None:
             self.roll_off = roll_off
         elif alpha is not None:
@@ -222,11 +239,15 @@ class InterferometerStrainData(object):
         """
         Output the time series strain data as a :class:`gwpy.timeseries.TimeSeries`.
         """
+        try:
+            from gwpy.timeseries import TimeSeries
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError("Cannot output strain data as gwpy TimeSeries")
 
-        return gwpy.timeseries.TimeSeries(self.time_domain_strain,
-                                          sample_rate=self.sampling_frequency,
-                                          t0=self.start_time,
-                                          channel=self.channel)
+        return TimeSeries(
+            self.time_domain_strain, sample_rate=self.sampling_frequency,
+            t0=self.start_time, channel=self.channel
+        )
 
     def to_pycbc_timeseries(self):
         """
@@ -234,37 +255,48 @@ class InterferometerStrainData(object):
         """
 
         try:
-            import pycbc
-        except ImportError:
-            raise ImportError("Cannot output strain data as PyCBC TimeSeries")
+            from pycbc.types.timeseries import TimeSeries
+            from lal import LIGOTimeGPS
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError("Cannot output strain data as PyCBC TimeSeries")
 
-        return pycbc.types.timeseries.TimeSeries(self.time_domain_strain,
-                                                 delta_t=(1. / self.sampling_frequency),
-                                                 epoch=lal.LIGOTimeGPS(self.start_time))
+        return TimeSeries(
+            self.time_domain_strain, delta_t=(1. / self.sampling_frequency),
+            epoch=LIGOTimeGPS(self.start_time)
+        )
 
     def to_lal_timeseries(self):
         """
         Output the time series strain data as a LAL TimeSeries object.
         """
+        try:
+            from lal import CreateREAL8TimeSeries, LIGOTimeGPS, SecondUnit
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError("Cannot output strain data as PyCBC TimeSeries")
 
-        laldata = lal.CreateREAL8TimeSeries("",
-                                            lal.LIGOTimeGPS(self.start_time),
-                                            0., (1. / self.sampling_frequency),
-                                            lal.SecondUnit,
-                                            len(self.time_domain_strain))
-        laldata.data.data[:] = self.time_domain_strain
+        lal_data = CreateREAL8TimeSeries(
+            "", LIGOTimeGPS(self.start_time), 0, 1 / self.sampling_frequency,
+            SecondUnit, len(self.time_domain_strain)
+        )
+        lal_data.data.data[:] = self.time_domain_strain
 
-        return laldata
+        return lal_data
 
     def to_gwpy_frequencyseries(self):
         """
         Output the frequency series strain data as a :class:`gwpy.frequencyseries.FrequencySeries`.
         """
+        try:
+            from gwpy.frequencyseries import FrequencySeries
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError("Cannot output strain data as gwpy FrequencySeries")
 
-        return gwpy.frequencyseries.FrequencySeries(self.frequency_domain_strain,
-                                                    frequencies=self.frequency_array,
-                                                    epoch=self.start_time,
-                                                    channel=self.channel)
+        return FrequencySeries(
+            self.frequency_domain_strain,
+            frequencies=self.frequency_array,
+            epoch=self.start_time,
+            channel=self.channel
+        )
 
     def to_pycbc_frequencyseries(self):
         """
@@ -272,31 +304,42 @@ class InterferometerStrainData(object):
         """
 
         try:
-            import pycbc
+            from pycbc.types.frequencyseries import FrequencySeries
+            from lal import LIGOTimeGPS
         except ImportError:
             raise ImportError("Cannot output strain data as PyCBC FrequencySeries")
 
-        return pycbc.types.frequencyseries.FrequencySeries(self.frequency_domain_strain,
-                                                           delta_f=(self.frequency_array[1] - self.frequency_array[0]),
-                                                           epoch=lal.LIGOTimeGPS(self.start_time))
+        return FrequencySeries(
+            self.frequency_domain_strain,
+            delta_f=1 / self.duration,
+            epoch=LIGOTimeGPS(self.start_time)
+        )
 
     def to_lal_frequencyseries(self):
         """
         Output the frequency series strain data as a LAL FrequencySeries object.
         """
+        try:
+            from lal import CreateCOMPLEX16FrequencySeries, LIGOTimeGPS, SecondUnit
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError("Cannot output strain data as PyCBC TimeSeries")
 
-        laldata = lal.CreateCOMPLEX16FrequencySeries("",
-                                                     lal.LIGOTimeGPS(self.start_time),
-                                                     self.frequency_array[0],
-                                                     (self.frequency_array[1] - self.frequency_array[0]),
-                                                     lal.SecondUnit,
-                                                     len(self.frequency_domain_strain))
-        laldata.data.data[:] = self.frequency_domain_strain
+        lal_data = CreateCOMPLEX16FrequencySeries(
+            "",
+            LIGOTimeGPS(self.start_time),
+            self.frequency_array[0],
+            1 / self.duration,
+            SecondUnit,
+            len(self.frequency_domain_strain)
+        )
+        lal_data.data.data[:] = self.frequency_domain_strain
 
-        return laldata
+        return lal_data
 
     def low_pass_filter(self, filter_freq=None):
         """ Low pass filter the data """
+        from gwpy.signal.filter_design import lowpass
+        from gwpy.timeseries import TimeSeries
 
         if filter_freq is None:
             logger.debug(
@@ -311,10 +354,8 @@ class InterferometerStrainData(object):
             return
 
         logger.debug("Applying low pass filter with filter frequency {}".format(filter_freq))
-        bp = gwpy.signal.filter_design.lowpass(
-            filter_freq, self.sampling_frequency)
-        strain = gwpy.timeseries.TimeSeries(
-            self.time_domain_strain, sample_rate=self.sampling_frequency)
+        bp = lowpass(filter_freq, self.sampling_frequency)
+        strain = TimeSeries(self.time_domain_strain, sample_rate=self.sampling_frequency)
         strain = strain.filter(bp, filtfilt=True)
         self._time_domain_strain = strain.value
 
@@ -327,7 +368,7 @@ class InterferometerStrainData(object):
         PSD file.
 
         Parameters
-        ----------
+        ==========
         fft_length: float
             Duration of the analysis segment.
         overlap: float
@@ -343,11 +384,12 @@ class InterferometerStrainData(object):
             be removed before creating the PSD.
 
         Returns
-        -------
+        =======
         frequency_array, psd : array_like
             The frequencies and power spectral density array
 
         """
+        from gwpy.timeseries import TimeSeries
 
         data = self.time_domain_strain
 
@@ -363,7 +405,7 @@ class InterferometerStrainData(object):
                 data = data[idxs]
 
         # WARNING this line can cause issues if the data is non-contiguous
-        strain = gwpy.timeseries.TimeSeries(data=data, sample_rate=self.sampling_frequency)
+        strain = TimeSeries(data=data, sample_rate=self.sampling_frequency)
         psd_alpha = 2 * self.roll_off / fft_length
         logger.info(
             "Tukey window PSD data with alpha={}, roll off={}".format(
@@ -430,7 +472,7 @@ class InterferometerStrainData(object):
         is applied.
 
         Parameters
-        ----------
+        ==========
         time_domain_strain: array_like
             An array of the time domain strain.
         sampling_frequency: float
@@ -464,13 +506,14 @@ class InterferometerStrainData(object):
         is applied.
 
         Parameters
-        ----------
+        ==========
         time_series: gwpy.timeseries.timeseries.TimeSeries
             The data to use
 
         """
+        from gwpy.timeseries import TimeSeries
         logger.debug('Setting data using provided gwpy TimeSeries object')
-        if type(time_series) != gwpy.timeseries.TimeSeries:
+        if not isinstance(time_series, TimeSeries):
             raise ValueError("Input time_series is not a gwpy TimeSeries")
         self._times_and_frequencies = \
             CoupledTimeAndFrequencySeries(duration=time_series.duration.value,
@@ -494,7 +537,7 @@ class InterferometerStrainData(object):
         is applied.
 
         Parameters
-        ----------
+        ==========
         name: str
             Detector name, e.g., 'H1'.
         start_time: float
@@ -521,12 +564,13 @@ class InterferometerStrainData(object):
         """ Set the strain data from a csv file
 
         Parameters
-        ----------
+        ==========
         filename: str
             The path to the file to read in
 
         """
-        timeseries = gwpy.timeseries.TimeSeries.read(filename, format='csv')
+        from gwpy.timeseries import TimeSeries
+        timeseries = TimeSeries.read(filename, format='csv')
         self.set_from_gwpy_timeseries(timeseries)
 
     def set_from_frequency_domain_strain(
@@ -535,7 +579,7 @@ class InterferometerStrainData(object):
         """ Set the `frequency_domain_strain` from a numpy array
 
         Parameters
-        ----------
+        ==========
         frequency_domain_strain: array_like
             The data to set.
         sampling_frequency: float
@@ -568,7 +612,7 @@ class InterferometerStrainData(object):
         """ Set the `frequency_domain_strain` by generating a noise realisation
 
         Parameters
-        ----------
+        ==========
         power_spectral_density: bilby.gw.detector.PowerSpectralDensity
             A PowerSpectralDensity object used to generate the data
         sampling_frequency: float
@@ -599,7 +643,7 @@ class InterferometerStrainData(object):
         """ Set the `frequency_domain_strain` to zero noise
 
         Parameters
-        ----------
+        ==========
         sampling_frequency: float
             The sampling frequency (in Hz)
         duration: float
@@ -614,7 +658,7 @@ class InterferometerStrainData(object):
                                                                     start_time=start_time)
         logger.debug('Setting zero noise data')
         self._frequency_domain_strain = np.zeros_like(self.frequency_array,
-                                                      dtype=np.complex)
+                                                      dtype=complex)
 
     def set_from_frame_file(
             self, frame_file, sampling_frequency, duration, start_time=0,
@@ -622,7 +666,7 @@ class InterferometerStrainData(object):
         """ Set the `frequency_domain_strain` from a frame fiile
 
         Parameters
-        ----------
+        ==========
         frame_file: str
             File from which to load data.
         channel: str
@@ -658,7 +702,7 @@ class InterferometerStrainData(object):
         also verifies that the specified channel is given in the correct format.
 
         Parameters
-        ----------
+        ==========
         channel: str
             Channel to look for using gwpy in the format `IFO:Channel`
         duration: float
@@ -669,6 +713,7 @@ class InterferometerStrainData(object):
             The sampling frequency (in Hz)
 
         """
+        from gwpy.timeseries import TimeSeries
         channel_comp = channel.split(':')
         if len(channel_comp) != 2:
             raise IndexError('Channel name must have format `IFO:Channel`')
@@ -678,8 +723,108 @@ class InterferometerStrainData(object):
             start_time=start_time)
 
         logger.info('Fetching data using channel {}'.format(channel))
-        strain = gwpy.timeseries.TimeSeries.get(
-            channel, start_time, start_time + duration)
+        strain = TimeSeries.get(channel, start_time, start_time + duration)
         strain = strain.resample(sampling_frequency)
 
         self.set_from_gwpy_timeseries(strain)
+
+
+class Notch(object):
+    def __init__(self, minimum_frequency, maximum_frequency):
+        """ A notch object storing the maximum and minimum frequency of the notch
+
+        Parameters
+        ==========
+        minimum_frequency, maximum_frequency: float
+            The minimum and maximum frequency of the notch
+
+        """
+
+        if 0 < minimum_frequency < maximum_frequency < np.inf:
+            self.minimum_frequency = minimum_frequency
+            self.maximum_frequency = maximum_frequency
+        else:
+            msg = ("Your notch minimum_frequency {} and maximum_frequency {} are invalid"
+                   .format(minimum_frequency, maximum_frequency))
+            raise ValueError(msg)
+
+    def get_idxs(self, frequency_array):
+        """ Get a boolean mask for the frequencies in frequency_array in the notch
+
+        Parameters
+        ==========
+        frequency_array: np.ndarray
+            An array of frequencies
+
+        Returns
+        =======
+        idxs: np.ndarray
+            An array of booleans which are True for frequencies in the notch
+
+        """
+        lower = (frequency_array > self.minimum_frequency)
+        upper = (frequency_array < self.maximum_frequency)
+        return lower & upper
+
+    def check_frequency(self, freq):
+        """ Check if freq is inside the notch
+
+        Parameters
+        ==========
+        freq: float
+            The frequency to check
+
+        Returns
+        =======
+        True/False:
+            If freq inside the notch, return True, else False
+        """
+
+        if self.minimum_frequency < freq < self.maximum_frequency:
+            return True
+        else:
+            return False
+
+
+class NotchList(list):
+    def __init__(self, notch_list):
+        """ A list of notches
+
+        Parameters
+        ==========
+        notch_list: list
+            A list of length-2 tuples of the (max, min) frequency for the
+            notches.
+
+        Raises
+        ======
+        ValueError
+            If the list is malformed.
+        """
+
+        if notch_list is not None:
+            for notch in notch_list:
+                if isinstance(notch, tuple) and len(notch) == 2:
+                    self.append(Notch(*notch))
+                else:
+                    msg = "notch_list {} is malformed".format(notch_list)
+                    raise ValueError(msg)
+
+    def check_frequency(self, freq):
+        """ Check if freq is inside the notch list
+
+        Parameters
+        ==========
+        freq: float
+            The frequency to check
+
+        Returns
+        =======
+        True/False:
+            If freq inside any of the notches, return True, else False
+        """
+
+        for notch in self:
+            if notch.check_frequency(freq):
+                return True
+        return False

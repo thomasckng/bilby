@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-""" Helper script to faciliate downloading data from LOSC
+""" Helper script to facilitate downloading data from LOSC
 
 Usage: To download the GW150914 data from https://losc.ligo.org/events/
 
@@ -7,7 +7,6 @@ $ python get_LOSC_event_data -e GW150914
 
 """
 
-from __future__ import division
 import numpy as np
 import os
 import argparse

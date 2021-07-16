@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 
 import numpy as np
 
@@ -84,7 +83,7 @@ class PyPolyChord(NestedSampler):
         The second column are the log likelihoods, the remaining columns are the physical parameters
 
         Returns
-        -------
+        =======
         array_like, array_like: The log_likelihoods and the associated parameters
 
         """

@@ -4,7 +4,6 @@ Tutorial to demonstrate running parameter estimation on a full 15 parameter
 space for an injected cbc signal. This is the standard injection analysis script
 one can modify for the study of injected CBC events.
 """
-from __future__ import division, print_function
 import numpy as np
 import bilby
 
@@ -54,7 +53,7 @@ ifos.inject_signal(waveform_generator=waveform_generator,
                    parameters=injection_parameters)
 
 
-# For this analysis, we implemenet the standard BBH priors defined, except for
+# For this analysis, we implement the standard BBH priors defined, except for
 # the definition of the time prior, which is defined as uniform about the
 # injected value.
 # Furthermore, we decide to sample in chirp mass and mass ratio, due to the

@@ -1,11 +1,11 @@
 import importlib
 import os
-import tempfile
 import shutil
 import distutils.dir_util
 import signal
 import time
 import datetime
+import sys
 
 import numpy as np
 
@@ -24,8 +24,8 @@ class Pymultinest(NestedSampler):
     for that class for further help. Under Other Parameters, we list commonly
     used kwargs and the bilby defaults.
 
-    Other Parameters
-    ----------------
+    Parameters
+    ==========
     npoints: int
         The number of live points, note this can also equivalently be given as
         one of [nlive, nlives, n_live_points]
@@ -129,9 +129,9 @@ class Pymultinest(NestedSampler):
 
     def _apply_multinest_boundaries(self):
         if self.kwargs["wrapped_params"] is None:
-            self.kwargs["wrapped_params"] = []
-            for param, value in self.priors.items():
-                if value.boundary == "periodic":
+            self.kwargs["wrapped_params"] = list()
+            for param in self.search_parameter_keys:
+                if self.priors[param].boundary == "periodic":
                     self.kwargs["wrapped_params"].append(1)
                 else:
                     self.kwargs["wrapped_params"].append(0)
@@ -175,7 +175,7 @@ class Pymultinest(NestedSampler):
         self._calculate_and_save_sampling_time()
         if self.use_temporary_directory:
             self._move_temporary_directory_to_proper_path()
-        os._exit(self.exit_code)
+        sys.exit(self.exit_code)
 
     def _copy_temporary_directory_contents_to_proper_path(self):
         """
@@ -238,26 +238,6 @@ class Pymultinest(NestedSampler):
         self.result.outputfiles_basename = self.outputfiles_basename
         self.result.sampling_time = datetime.timedelta(seconds=self.total_sampling_time)
         return self.result
-
-    def _setup_run_directory(self):
-        """
-        If using a temporary directory, the output directory is moved to the
-        temporary directory.
-        """
-        if self.use_temporary_directory:
-            temporary_outputfiles_basename = tempfile.TemporaryDirectory().name
-            self.temporary_outputfiles_basename = temporary_outputfiles_basename
-
-            if os.path.exists(self.outputfiles_basename):
-                distutils.dir_util.copy_tree(self.outputfiles_basename, self.temporary_outputfiles_basename)
-            check_directory_exists_and_if_not_mkdir(temporary_outputfiles_basename)
-
-            self.kwargs["outputfiles_basename"] = self.temporary_outputfiles_basename
-            logger.info("Using temporary file {}".format(temporary_outputfiles_basename))
-        else:
-            check_directory_exists_and_if_not_mkdir(self.outputfiles_basename)
-            self.kwargs["outputfiles_basename"] = self.outputfiles_basename
-            logger.info("Using output file {}".format(self.outputfiles_basename))
 
     def _check_and_load_sampling_time_file(self):
         self.time_file_path = self.kwargs["outputfiles_basename"] + '/sampling_time.dat'

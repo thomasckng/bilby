@@ -1,8 +1,6 @@
-from __future__ import division
 import sys
 import multiprocessing
 
-from tqdm import tqdm
 import numpy as np
 from pandas import DataFrame
 
@@ -12,13 +10,6 @@ from ..core.prior import DeltaFunction
 from .utils import lalsim_SimInspiralTransformPrecessingNewInitialConditions
 from .eos.eos import SpectralDecompositionEOS, EOSFamily, IntegrateTOV
 from .cosmology import get_cosmology
-
-try:
-    from astropy import units
-    from astropy.cosmology import z_at_value
-except ImportError:
-    logger.debug("You do not have astropy installed currently. You will"
-                 " not be able to use some of the prebuilt functions.")
 
 
 def redshift_to_luminosity_distance(redshift, cosmology=None):
@@ -33,12 +24,16 @@ def redshift_to_comoving_distance(redshift, cosmology=None):
 
 @np.vectorize
 def luminosity_distance_to_redshift(distance, cosmology=None):
+    from astropy import units
+    from astropy.cosmology import z_at_value
     cosmology = get_cosmology(cosmology)
     return z_at_value(cosmology.luminosity_distance, distance * units.Mpc)
 
 
 @np.vectorize
 def comoving_distance_to_redshift(distance, cosmology=None):
+    from astropy import units
+    from astropy.cosmology import z_at_value
     cosmology = get_cosmology(cosmology)
     return z_at_value(cosmology.comoving_distance, distance * units.Mpc)
 
@@ -84,7 +79,7 @@ def transform_precessing_spins(theta_jn, phi_jl, tilt_1, tilt_2, phi_12, a_1,
     All parameters are defined at the reference frequency
 
     Parameters
-    ----------
+    ==========
     theta_jn: float
         Inclination angle
     phi_jl: float
@@ -108,7 +103,7 @@ def transform_precessing_spins(theta_jn, phi_jl, tilt_1, tilt_2, phi_12, a_1,
         Orbital phase
 
     Returns
-    -------
+    =======
     iota: float
         Transformed inclination
     spin_1x, spin_1y, spin_1z, spin_2x, spin_2y, spin_2z: float
@@ -138,12 +133,12 @@ def convert_to_lal_binary_black_hole_parameters(parameters):
     The keys in added_keys should be popped after evaluating the waveform.
 
     Parameters
-    ----------
+    ==========
     parameters: dict
         dictionary of parameter values to convert into the required parameters
 
-    Return
-    ------
+    Returns
+    =======
     converted_parameters: dict
         dict of the required parameters
     added_keys: list
@@ -235,18 +230,42 @@ def convert_to_lal_binary_black_hole_parameters(parameters):
     for idx in ['1', '2']:
         key = 'chi_{}'.format(idx)
         if key in original_keys:
-            converted_parameters['a_{}'.format(idx)] = abs(
-                converted_parameters[key])
-            converted_parameters['cos_tilt_{}'.format(idx)] = \
-                np.sign(converted_parameters[key])
-            converted_parameters['phi_jl'] = 0.0
-            converted_parameters['phi_12'] = 0.0
+            if "chi_{}_in_plane".format(idx) in original_keys:
+                converted_parameters["a_{}".format(idx)] = (
+                    converted_parameters[f"chi_{idx}"] ** 2
+                    + converted_parameters[f"chi_{idx}_in_plane"] ** 2
+                ) ** 0.5
+                converted_parameters[f"cos_tilt_{idx}"] = (
+                    converted_parameters[f"chi_{idx}"]
+                    / converted_parameters[f"a_{idx}"]
+                )
+            elif "a_{}".format(idx) not in original_keys:
+                converted_parameters['a_{}'.format(idx)] = abs(
+                    converted_parameters[key])
+                converted_parameters['cos_tilt_{}'.format(idx)] = \
+                    np.sign(converted_parameters[key])
+                converted_parameters['phi_jl'] = 0.0
+                converted_parameters['phi_12'] = 0.0
+            else:
+                converted_parameters[f"cos_tilt_{idx}"] = (
+                    converted_parameters[key] / converted_parameters[f"a_{idx}"]
+                )
 
     for angle in ['tilt_1', 'tilt_2', 'theta_jn']:
         cos_angle = str('cos_' + angle)
         if cos_angle in converted_parameters.keys():
-            converted_parameters[angle] =\
-                np.arccos(converted_parameters[cos_angle])
+            with np.errstate(invalid="ignore"):
+                converted_parameters[angle] =\
+                    np.arccos(converted_parameters[cos_angle])
+
+    if "delta_phase" in original_keys:
+        with np.errstate(invalid="ignore"):
+            converted_parameters["phase"] = np.mod(
+                converted_parameters["delta_phase"]
+                - np.sign(np.cos(converted_parameters["theta_jn"]))
+                * converted_parameters["psi"],
+                2 * np.pi
+            )
 
     added_keys = [key for key in converted_parameters.keys()
                   if key not in original_keys]
@@ -269,12 +288,12 @@ def convert_to_lal_binary_neutron_star_parameters(parameters):
     The keys in added_keys should be popped after evaluating the waveform.
 
     Parameters
-    ----------
+    ==========
     parameters: dict
         dictionary of parameter values to convert into the required parameters
 
-    Return
-    ------
+    Returns
+    =======
     converted_parameters: dict
         dict of the required parameters
     added_keys: list
@@ -388,14 +407,14 @@ def total_mass_and_mass_ratio_to_component_masses(mass_ratio, total_mass):
     Convert total mass and mass ratio of a binary to its component masses.
 
     Parameters
-    ----------
+    ==========
     mass_ratio: float
         Mass ratio (mass_2/mass_1) of the binary
     total_mass: float
         Total mass of the binary
 
-    Return
-    ------
+    Returns
+    =======
     mass_1: float
         Mass of the heavier object
     mass_2: float
@@ -412,12 +431,12 @@ def symmetric_mass_ratio_to_mass_ratio(symmetric_mass_ratio):
     Convert the symmetric mass ratio to the normal mass ratio.
 
     Parameters
-    ----------
+    ==========
     symmetric_mass_ratio: float
         Symmetric mass ratio of the binary
 
-    Return
-    ------
+    Returns
+    =======
     mass_ratio: float
         Mass ratio of the binary
     """
@@ -431,14 +450,14 @@ def chirp_mass_and_total_mass_to_symmetric_mass_ratio(chirp_mass, total_mass):
     Convert chirp mass and total mass of a binary to its symmetric mass ratio.
 
     Parameters
-    ----------
+    ==========
     chirp_mass: float
         Chirp mass of the binary
     total_mass: float
         Total mass of the binary
 
-    Return
-    ------
+    Returns
+    =======
     symmetric_mass_ratio: float
         Symmetric mass ratio of the binary
     """
@@ -455,17 +474,17 @@ def chirp_mass_and_primary_mass_to_mass_ratio(chirp_mass, mass_1):
 
         (chirp_mass/mass_1)^5 = q^3 / (1 + q)
 
-    Solving for q, we find the releation expressed in python below for q.
+    Solving for q, we find the relation expressed in python below for q.
 
     Parameters
-    ----------
+    ==========
     chirp_mass: float
         Chirp mass of the binary
     mass_1: float
         The primary mass
 
-    Return
-    ------
+    Returns
+    =======
     mass_ratio: float
         Mass ratio (mass_2/mass_1) of the binary
     """
@@ -481,21 +500,22 @@ def chirp_mass_and_mass_ratio_to_total_mass(chirp_mass, mass_ratio):
     Convert chirp mass and mass ratio of a binary to its total mass.
 
     Parameters
-    ----------
+    ==========
     chirp_mass: float
         Chirp mass of the binary
     mass_ratio: float
         Mass ratio (mass_2/mass_1) of the binary
 
-    Return
-    ------
+    Returns
+    =======
     mass_1: float
         Mass of the heavier object
     mass_2: float
         Mass of the lighter object
     """
 
-    return chirp_mass * (1 + mass_ratio) ** 1.2 / mass_ratio ** 0.6
+    with np.errstate(invalid="ignore"):
+        return chirp_mass * (1 + mass_ratio) ** 1.2 / mass_ratio ** 0.6
 
 
 def component_masses_to_chirp_mass(mass_1, mass_2):
@@ -503,14 +523,14 @@ def component_masses_to_chirp_mass(mass_1, mass_2):
     Convert the component masses of a binary to its chirp mass.
 
     Parameters
-    ----------
+    ==========
     mass_1: float
         Mass of the heavier object
     mass_2: float
         Mass of the lighter object
 
-    Return
-    ------
+    Returns
+    =======
     chirp_mass: float
         Chirp mass of the binary
     """
@@ -523,14 +543,14 @@ def component_masses_to_total_mass(mass_1, mass_2):
     Convert the component masses of a binary to its total mass.
 
     Parameters
-    ----------
+    ==========
     mass_1: float
         Mass of the heavier object
     mass_2: float
         Mass of the lighter object
 
-    Return
-    ------
+    Returns
+    =======
     total_mass: float
         Total mass of the binary
     """
@@ -543,14 +563,14 @@ def component_masses_to_symmetric_mass_ratio(mass_1, mass_2):
     Convert the component masses of a binary to its symmetric mass ratio.
 
     Parameters
-    ----------
+    ==========
     mass_1: float
         Mass of the heavier object
     mass_2: float
         Mass of the lighter object
 
-    Return
-    ------
+    Returns
+    =======
     symmetric_mass_ratio: float
         Symmetric mass ratio of the binary
     """
@@ -563,14 +583,14 @@ def component_masses_to_mass_ratio(mass_1, mass_2):
     Convert the component masses of a binary to its chirp mass.
 
     Parameters
-    ----------
+    ==========
     mass_1: float
         Mass of the heavier object
     mass_2: float
         Mass of the lighter object
 
-    Return
-    ------
+    Returns
+    =======
     mass_ratio: float
         Mass ratio of the binary
     """
@@ -585,14 +605,14 @@ def mass_1_and_chirp_mass_to_mass_ratio(mass_1, chirp_mass):
     This involves solving mc = m1 * q**(3/5) / (1 + q)**(1/5).
 
     Parameters
-    ----------
+    ==========
     mass_1: float
         Mass of the heavier object
     chirp_mass: float
         Mass of the lighter object
 
-    Return
-    ------
+    Returns
+    =======
     mass_ratio: float
         Mass ratio of the binary
     """
@@ -611,7 +631,7 @@ def lambda_1_lambda_2_to_lambda_tilde(lambda_1, lambda_2, mass_1, mass_2):
     See, e.g., Wade et al., https://arxiv.org/pdf/1402.5156.pdf.
 
     Parameters
-    ----------
+    ==========
     lambda_1: float
         Tidal parameter of more massive neutron star.
     lambda_2: float
@@ -621,8 +641,8 @@ def lambda_1_lambda_2_to_lambda_tilde(lambda_1, lambda_2, mass_1, mass_2):
     mass_2: float
         Mass of less massive neutron star.
 
-    Return
-    ------
+    Returns
+    ======
     lambda_tilde: float
         Dominant tidal term.
     """
@@ -643,7 +663,7 @@ def lambda_1_lambda_2_to_delta_lambda_tilde(lambda_1, lambda_2, mass_1, mass_2):
     See, e.g., Wade et al., https://arxiv.org/pdf/1402.5156.pdf.
 
     Parameters
-    ----------
+    ==========
     lambda_1: float
         Tidal parameter of more massive neutron star.
     lambda_2: float
@@ -653,8 +673,8 @@ def lambda_1_lambda_2_to_delta_lambda_tilde(lambda_1, lambda_2, mass_1, mass_2):
     mass_2: float
         Mass of less massive neutron star.
 
-    Return
-    ------
+    Returns
+    =======
     delta_lambda_tilde: float
         Second dominant tidal term.
     """
@@ -677,7 +697,7 @@ def lambda_tilde_delta_lambda_tilde_to_lambda_1_lambda_2(
     See, e.g., Wade et al., https://arxiv.org/pdf/1402.5156.pdf.
 
     Parameters
-    ----------
+    ==========
     lambda_tilde: float
         Dominant tidal term.
     delta_lambda_tilde: float
@@ -687,8 +707,8 @@ def lambda_tilde_delta_lambda_tilde_to_lambda_1_lambda_2(
     mass_2: float
         Mass of less massive neutron star.
 
-    Return
-    ------
+    Returns
+    =======
     lambda_1: float
         Tidal parameter of more massive neutron star.
     lambda_2: float
@@ -723,7 +743,7 @@ def lambda_tilde_to_lambda_1_lambda_2(
     See, e.g., Wade et al., https://arxiv.org/pdf/1402.5156.pdf.
 
     Parameters
-    ----------
+    ==========
     lambda_tilde: float
         Dominant tidal term.
     mass_1: float
@@ -731,8 +751,8 @@ def lambda_tilde_to_lambda_1_lambda_2(
     mass_2: float
         Mass of less massive neutron star.
 
-    Return
-    ------
+    Returns
+    =======
     lambda_1: float
         Tidal parameter of more massive neutron star.
     lambda_2: float
@@ -762,12 +782,12 @@ def _generate_all_cbc_parameters(sample, defaults, base_conversion,
             logger.debug('Assuming {} = {}'.format(key, default))
 
     output_sample = fill_from_fixed_priors(output_sample, priors)
-    output_sample, _ = base_conversion(output_sample)
     if likelihood is not None:
         if (
                 hasattr(likelihood, 'phase_marginalization') or
                 hasattr(likelihood, 'time_marginalization') or
-                hasattr(likelihood, 'distance_marginalization')
+                hasattr(likelihood, 'distance_marginalization') or
+                hasattr(likelihood, 'calibration_marginalization')
         ):
             try:
                 generate_posterior_samples_from_marginalized_likelihood(
@@ -798,6 +818,9 @@ def _generate_all_cbc_parameters(sample, defaults, base_conversion,
                     "Failed to generate sky frame parameters for type {}"
                     .format(type(output_sample))
                 )
+    if likelihood is not None:
+        compute_snrs(output_sample, likelihood)
+    output_sample, _ = base_conversion(output_sample)
     for key, func in zip(["mass", "spin", "source frame"], [
             generate_mass_parameters, generate_spin_parameters,
             generate_source_frame_parameters]):
@@ -807,8 +830,6 @@ def _generate_all_cbc_parameters(sample, defaults, base_conversion,
             logger.info(
                 "Generation of {} parameters failed with message {}".format(
                     key, e))
-    if likelihood is not None:
-        compute_snrs(output_sample, likelihood)
     return output_sample
 
 
@@ -818,7 +839,7 @@ def generate_all_bbh_parameters(sample, likelihood=None, priors=None, npool=1):
     BBH parameters, in place.
 
     Parameters
-    ----------
+    ==========
     sample: dict or pandas.DataFrame
         Samples to fill in with extra parameters, this may be either an
         injection or posterior samples.
@@ -847,7 +868,7 @@ def generate_all_bns_parameters(sample, likelihood=None, priors=None, npool=1):
     calculated.
 
     Parameters
-    ----------
+    ==========
     sample: dict or pandas.DataFrame
         Samples to fill in with extra parameters, this may be either an
         injection or posterior samples.
@@ -890,14 +911,14 @@ def fill_from_fixed_priors(sample, priors):
     """Add parameters with delta function prior to the data frame/dictionary.
 
     Parameters
-    ----------
+    ==========
     sample: dict
         A dictionary or data frame
     priors: dict
         A dictionary of priors
 
     Returns
-    -------
+    =======
     dict:
     """
     output_sample = sample.copy()
@@ -916,12 +937,12 @@ def generate_mass_parameters(sample):
         chirp mass, total mass, symmetric mass ratio, mass ratio
 
     Parameters
-    ----------
+    ==========
     sample : dict
         The input dictionary with component masses 'mass_1' and 'mass_2'
 
     Returns
-    -------
+    =======
     dict: The updated dictionary
 
     """
@@ -947,12 +968,12 @@ def generate_spin_parameters(sample):
         cartesian spin components, chi_eff, chi_p cos tilt 1, cos tilt 2
 
     Parameters
-    ----------
+    ==========
     sample : dict, pandas.DataFrame
         The input dictionary with some spin parameters
 
     Returns
-    -------
+    =======
     dict: The updated dictionary
 
     """
@@ -994,13 +1015,13 @@ def generate_component_spins(sample):
     This function uses a lalsimulation function to transform the spins.
 
     Parameters
-    ----------
+    ==========
     sample: A dictionary with the necessary spin conversion parameters:
     'theta_jn', 'phi_jl', 'tilt_1', 'tilt_2', 'phi_12', 'a_1', 'a_2', 'mass_1',
     'mass_2', 'reference_frequency', 'phase'
 
     Returns
-    -------
+    =======
     dict: The updated dictionary
 
     """
@@ -1009,18 +1030,19 @@ def generate_component_spins(sample):
         ['theta_jn', 'phi_jl', 'tilt_1', 'tilt_2', 'phi_12', 'a_1', 'a_2',
          'mass_1', 'mass_2', 'reference_frequency', 'phase']
     if all(key in output_sample.keys() for key in spin_conversion_parameters):
-        output_sample['iota'], output_sample['spin_1x'],\
-            output_sample['spin_1y'], output_sample['spin_1z'], \
-            output_sample['spin_2x'], output_sample['spin_2y'],\
-            output_sample['spin_2z'] =\
-            transform_precessing_spins(
-                output_sample['theta_jn'], output_sample['phi_jl'],
-                output_sample['tilt_1'], output_sample['tilt_2'],
-                output_sample['phi_12'], output_sample['a_1'],
-                output_sample['a_2'],
-                output_sample['mass_1'] * solar_mass,
-                output_sample['mass_2'] * solar_mass,
-                output_sample['reference_frequency'], output_sample['phase'])
+        (
+            output_sample['iota'], output_sample['spin_1x'],
+            output_sample['spin_1y'], output_sample['spin_1z'],
+            output_sample['spin_2x'], output_sample['spin_2y'],
+            output_sample['spin_2z']
+        ) = np.vectorize(bilby_to_lalsimulation_spins)(
+            output_sample['theta_jn'], output_sample['phi_jl'],
+            output_sample['tilt_1'], output_sample['tilt_2'],
+            output_sample['phi_12'], output_sample['a_1'], output_sample['a_2'],
+            output_sample['mass_1'] * solar_mass,
+            output_sample['mass_2'] * solar_mass,
+            output_sample['reference_frequency'], output_sample['phase']
+        )
 
         output_sample['phi_1'] =\
             np.fmod(2 * np.pi + np.arctan2(
@@ -1049,12 +1071,12 @@ def generate_tidal_parameters(sample):
     lambda_tilde, delta_lambda_tilde
 
     Parameters
-    ----------
+    ==========
     sample: dict, pandas.DataFrame
         Should contain lambda_1, lambda_2
 
     Returns
-    -------
+    =======
     output_sample: dict, pandas.DataFrame
         Updated sample
     """
@@ -1077,11 +1099,11 @@ def generate_source_frame_parameters(sample):
     Generate source frame masses along with redshifts and comoving distance.
 
     Parameters
-    ----------
+    ==========
     sample: dict, pandas.DataFrame
 
     Returns
-    -------
+    =======
     output_sample: dict, pandas.DataFrame
     """
     output_sample = sample.copy()
@@ -1105,7 +1127,7 @@ def compute_snrs(sample, likelihood):
     and print it out.
 
     Parameters
-    ----------
+    ==========
     sample: dict or array_like
 
     likelihood: bilby.gw.likelihood.GravitationalWaveTransient
@@ -1116,21 +1138,22 @@ def compute_snrs(sample, likelihood):
         if isinstance(sample, dict):
             signal_polarizations =\
                 likelihood.waveform_generator.frequency_domain_strain(sample)
+            likelihood.parameters.update(sample)
             for ifo in likelihood.interferometers:
-                signal = ifo.get_detector_response(signal_polarizations, sample)
+                per_detector_snr = likelihood.calculate_snrs(
+                    signal_polarizations, ifo)
                 sample['{}_matched_filter_snr'.format(ifo.name)] =\
-                    ifo.matched_filter_snr(signal=signal)
+                    per_detector_snr.complex_matched_filter_snr
                 sample['{}_optimal_snr'.format(ifo.name)] = \
-                    ifo.optimal_snr_squared(signal=signal) ** 0.5
-
+                    per_detector_snr.optimal_snr_squared.real ** 0.5
         else:
+            from tqdm.auto import tqdm
             logger.info(
                 'Computing SNRs for every sample.')
 
             matched_filter_snrs = {
                 ifo.name: [] for ifo in likelihood.interferometers}
             optimal_snrs = {ifo.name: [] for ifo in likelihood.interferometers}
-
             for ii in tqdm(range(len(sample)), file=sys.stdout):
                 signal_polarizations =\
                     likelihood.waveform_generator.frequency_domain_strain(
@@ -1139,6 +1162,7 @@ def compute_snrs(sample, likelihood):
                 for ifo in likelihood.interferometers:
                     per_detector_snr = likelihood.calculate_snrs(
                         signal_polarizations, ifo)
+
                     matched_filter_snrs[ifo.name].append(
                         per_detector_snr.complex_matched_filter_snr)
                     optimal_snrs[ifo.name].append(
@@ -1163,7 +1187,7 @@ def generate_posterior_samples_from_marginalized_likelihood(
     See Eq. (C29-C32) of https://arxiv.org/abs/1809.02293
 
     Parameters
-    ----------
+    ==========
     samples: DataFrame
         Posterior from run with a marginalised likelihood.
     likelihood: bilby.gw.likelihood.GravitationalWaveTransient
@@ -1171,14 +1195,15 @@ def generate_posterior_samples_from_marginalized_likelihood(
     npool: int, (default=1)
         If given, perform generation (where possible) using a multiprocessing pool
 
-    Return
-    ------
+    Returns
+    =======
     sample: DataFrame
         Returns the posterior with new samples.
     """
     if not any([likelihood.phase_marginalization,
                 likelihood.distance_marginalization,
-                likelihood.time_marginalization]):
+                likelihood.time_marginalization,
+                likelihood.calibration_marginalization]):
         return samples
 
     # pass through a dictionary
@@ -1186,6 +1211,7 @@ def generate_posterior_samples_from_marginalized_likelihood(
         return samples
     elif not isinstance(samples, DataFrame):
         raise ValueError("Unable to handle input samples of type {}".format(type(samples)))
+    from tqdm.auto import tqdm
 
     logger.info('Reconstructing marginalised parameters.')
 
@@ -1204,6 +1230,8 @@ def generate_posterior_samples_from_marginalized_likelihood(
     samples['geocent_time'] = new_samples[:, 0]
     samples['luminosity_distance'] = new_samples[:, 1]
     samples['phase'] = new_samples[:, 2]
+    if likelihood.calibration_marginalization:
+        samples['recalib_index'] = new_samples[:, 3]
     return samples
 
 
@@ -1214,6 +1242,7 @@ def generate_sky_frame_parameters(samples, likelihood):
         return
     elif not isinstance(samples, DataFrame):
         raise ValueError
+    from tqdm.auto import tqdm
 
     logger.info('Generating sky frame parameters.')
     new_samples = list()
@@ -1231,4 +1260,10 @@ def fill_sample(args):
     sample = dict(sample).copy()
     likelihood.parameters.update(dict(sample).copy())
     new_sample = likelihood.generate_posterior_sample_from_marginalized_likelihood()
-    return new_sample["geocent_time"], new_sample["luminosity_distance"], new_sample["phase"]
+
+    if not likelihood.calibration_marginalization:
+        return new_sample["geocent_time"], new_sample["luminosity_distance"],\
+            new_sample["phase"]
+    else:
+        return new_sample["geocent_time"], new_sample["luminosity_distance"],\
+            new_sample["phase"], new_sample['recalib_index']

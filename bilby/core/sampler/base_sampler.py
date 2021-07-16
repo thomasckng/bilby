@@ -1,10 +1,12 @@
-from __future__ import absolute_import
 import datetime
+import distutils.dir_util
 import numpy as np
+import os
+import tempfile
 
 from pandas import DataFrame
 
-from ..utils import logger, command_line_args, Counter
+from ..utils import logger, check_directory_exists_and_if_not_mkdir, command_line_args, Counter
 from ..prior import Prior, PriorDict, DeltaFunction, Constraint
 from ..result import Result, read_in_result
 
@@ -13,7 +15,7 @@ class Sampler(object):
     """ A sampler object to aid in setting up an inference run
 
     Parameters
-    ----------
+    ==========
     likelihood: likelihood.Likelihood
         A  object with a log_l method
     priors: bilby.core.prior.PriorDict, dict
@@ -48,7 +50,7 @@ class Sampler(object):
         Additional keyword arguments
 
     Attributes
-    ----------
+    ==========
     likelihood: likelihood.Likelihood
         A  object with a log_l method
     priors: bilby.core.prior.PriorDict
@@ -76,7 +78,7 @@ class Sampler(object):
         Dictionary of keyword arguments that can be used in the external sampler
 
     Raises
-    ------
+    ======
     TypeError:
         If external_sampler is neither a string nor an instance of this class
         If not all likelihood.parameters have been defined
@@ -224,7 +226,7 @@ class Sampler(object):
     def _initialise_result(self, result_class):
         """
         Returns
-        -------
+        =======
         bilby.core.result.Result: An initial template for the result
 
         """
@@ -248,29 +250,13 @@ class Sampler(object):
 
         return result
 
-    def _check_if_priors_can_be_sampled(self):
-        """Check if all priors can be sampled properly.
-
-        Raises
-        ------
-        AttributeError
-            prior can't be sampled.
-        """
-        for key in self.priors:
-            if isinstance(self.priors[key], Constraint):
-                continue
-            try:
-                self.priors[key].sample()
-            except AttributeError as e:
-                logger.warning('Cannot sample from {}, {}'.format(key, e))
-
     def _verify_parameters(self):
         """ Evaluate a set of parameters drawn from the prior
 
         Tests if the likelihood evaluation passes
 
         Raises
-        ------
+        ======
         TypeError
             Likelihood can't be evaluated.
 
@@ -294,7 +280,7 @@ class Sampler(object):
         """ Times the likelihood evaluation and print an info message
 
         Parameters
-        ----------
+        ==========
         n_evaluations: int
             The number of evaluations to estimate the evaluation time from
 
@@ -320,7 +306,13 @@ class Sampler(object):
         Checks if use_ratio is set. Prints a warning if use_ratio is set but
         not properly implemented.
         """
-        self._check_if_priors_can_be_sampled()
+        try:
+            self.priors.sample_subset(self.search_parameter_keys)
+        except (KeyError, AttributeError):
+            logger.error("Cannot sample from priors with keys: {}.".format(
+                self.search_parameter_keys
+            ))
+            raise
         if self.use_ratio is False:
             logger.debug("use_ratio set to False")
             return
@@ -340,12 +332,12 @@ class Sampler(object):
         """ Prior transform method that is passed into the external sampler.
 
         Parameters
-        ----------
+        ==========
         theta: list
             List of sampled values on a unit interval
 
         Returns
-        -------
+        =======
         list: Properly rescaled sampled values
         """
         return self.priors.rescale(self._search_parameter_keys, theta)
@@ -354,12 +346,12 @@ class Sampler(object):
         """
 
         Parameters
-        ----------
+        ==========
         theta: list
             List of sampled values on a unit interval
 
         Returns
-        -------
+        =======
         float: Joint ln prior probability of theta
 
         """
@@ -371,12 +363,12 @@ class Sampler(object):
         """
 
         Parameters
-        ----------
+        ==========
         theta: list
             List of values for the likelihood parameters
 
         Returns
-        -------
+        =======
         float: Log-likelihood or log-likelihood-ratio given the current
             likelihood.parameter values
 
@@ -398,7 +390,7 @@ class Sampler(object):
         """ Get a random draw from the prior distribution
 
         Returns
-        -------
+        =======
         draw: array_like
             An ndim-length array of values drawn from the prior. Parameters
             with delta-function (or fixed) priors are not returned
@@ -417,12 +409,12 @@ class Sampler(object):
         finite prior and likelihood (relevant for constrained priors).
 
         Parameters
-        ----------
+        ==========
         npoints: int
             The number of values to return
 
         Returns
-        -------
+        =======
         unit_cube, parameters, likelihood: tuple of array_like
             unit_cube (nlive, ndim) is an array of the prior samples from the
             unit cube, parameters (nlive, ndim) is the unit_cube array
@@ -451,24 +443,31 @@ class Sampler(object):
         Also catches the output of `numpy.nan_to_num`.
 
         Parameters
-        ----------
+        ==========
         theta: array_like
             Parameter values at which to evaluate likelihood
+        warning: bool
+            Whether or not to print a warning
 
         Returns
-        -------
+        =======
         bool, cube (nlive,
             True if the likelihood and prior are finite, false otherwise
 
         """
-        bad_values = [np.inf, np.nan_to_num(np.inf), np.nan]
-        if abs(self.log_prior(theta)) in bad_values:
+        log_p = self.log_prior(theta)
+        log_l = self.log_likelihood(theta)
+        return \
+            self._check_bad_value(val=log_p, warning=warning, theta=theta, label='prior') and \
+            self._check_bad_value(val=log_l, warning=warning, theta=theta, label='likelihood')
+
+    @staticmethod
+    def _check_bad_value(val, warning, theta, label):
+        val = np.abs(val)
+        bad_values = [np.inf, np.nan_to_num(np.inf)]
+        if val in bad_values or np.isnan(val):
             if warning:
-                logger.warning('Prior draw {} has inf prior'.format(theta))
-            return False
-        if abs(self.log_likelihood(theta)) in bad_values:
-            if warning:
-                logger.warning('Prior draw {} has inf likelihood'.format(theta))
+                logger.warning(f'Prior draw {theta} has inf {label}')
             return False
         return True
 
@@ -480,7 +479,7 @@ class Sampler(object):
         """
         TODO: Implement this method
         Raises
-        -------
+        =======
         ValueError: in any case
         """
         raise ValueError("Method not yet implemented")
@@ -541,7 +540,8 @@ class Sampler(object):
 
 
 class NestedSampler(Sampler):
-    npoints_equiv_kwargs = ['nlive', 'nlives', 'n_live_points', 'npoints', 'npoint', 'Nlive', 'num_live_points']
+    npoints_equiv_kwargs = ['nlive', 'nlives', 'n_live_points', 'npoints',
+                            'npoint', 'Nlive', 'num_live_points', 'num_particles']
     walks_equiv_kwargs = ['walks', 'steps', 'nmcmc']
 
     def reorder_loglikelihoods(self, unsorted_loglikelihoods, unsorted_samples,
@@ -553,7 +553,7 @@ class NestedSampler(Sampler):
         loglikelihoods
 
         Parameters
-        ----------
+        ==========
         sorted_samples, unsorted_samples: array-like
             Sorted and unsorted values of the samples. These should be of the
             same shape and contain the same sample values, but in different
@@ -562,7 +562,7 @@ class NestedSampler(Sampler):
             The loglikelihoods corresponding to the unsorted_samples
 
         Returns
-        -------
+        =======
         sorted_loglikelihoods: array-like
             The loglikelihoods reordered to match that of the sorted_samples
 
@@ -586,12 +586,12 @@ class NestedSampler(Sampler):
         the prior constraint here.
 
         Parameters
-        ----------
+        ==========
         theta: array_like
             Parameter values at which to evaluate likelihood
 
         Returns
-        -------
+        =======
         float: log_likelihood
         """
         if self.priors.evaluate_constraints({
@@ -600,6 +600,27 @@ class NestedSampler(Sampler):
             return Sampler.log_likelihood(self, theta)
         else:
             return np.nan_to_num(-np.inf)
+
+    def _setup_run_directory(self):
+        """
+        If using a temporary directory, the output directory is moved to the
+        temporary directory.
+        Used for Dnest4, Pymultinest, and Ultranest.
+        """
+        if self.use_temporary_directory:
+            temporary_outputfiles_basename = tempfile.TemporaryDirectory().name
+            self.temporary_outputfiles_basename = temporary_outputfiles_basename
+
+            if os.path.exists(self.outputfiles_basename):
+                distutils.dir_util.copy_tree(self.outputfiles_basename, self.temporary_outputfiles_basename)
+            check_directory_exists_and_if_not_mkdir(temporary_outputfiles_basename)
+
+            self.kwargs["outputfiles_basename"] = self.temporary_outputfiles_basename
+            logger.info("Using temporary file {}".format(temporary_outputfiles_basename))
+        else:
+            check_directory_exists_and_if_not_mkdir(self.outputfiles_basename)
+            self.kwargs["outputfiles_basename"] = self.outputfiles_basename
+            logger.info("Using output file {}".format(self.outputfiles_basename))
 
 
 class MCMCSampler(Sampler):
@@ -621,7 +642,7 @@ class MCMCSampler(Sampler):
         """ Uses the `emcee.autocorr` module to estimate the autocorrelation
 
         Parameters
-        ----------
+        ==========
         samples: array_like
             A chain of samples.
         c: float
@@ -645,6 +666,10 @@ class Error(Exception):
 
 class SamplerError(Error):
     """ Base class for Error related to samplers in this module """
+
+
+class ResumeError(Error):
+    """ Class for errors arising from resuming runs """
 
 
 class SamplerNotInstalledError(SamplerError):

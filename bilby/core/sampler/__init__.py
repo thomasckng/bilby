@@ -3,15 +3,16 @@ import sys
 import datetime
 from collections import OrderedDict
 
-from ..utils import command_line_args, logger
+import bilby
+from ..utils import command_line_args, logger, loaded_modules_dict
 from ..prior import PriorDict, DeltaFunction
-
 from .base_sampler import Sampler, SamplingMarginalisedParameterError
 from .cpnest import Cpnest
 from .dynamic_dynesty import DynamicDynesty
 from .dynesty import Dynesty
 from .emcee import Emcee
 from .kombine import Kombine
+from .nessai import Nessai
 from .nestle import Nestle
 from .polychord import PyPolyChord
 from .ptemcee import Ptemcee
@@ -20,14 +21,16 @@ from .pymc3 import Pymc3
 from .pymultinest import Pymultinest
 from .ultranest import Ultranest
 from .fake_sampler import FakeSampler
+from .dnest4 import DNest4
+from bilby.bilby_mcmc import Bilby_MCMC
 from . import proposal
 
 IMPLEMENTED_SAMPLERS = {
-    'cpnest': Cpnest, 'dynamic_dynesty': DynamicDynesty, 'dynesty': Dynesty,
-    'emcee': Emcee, 'kombine': Kombine, 'nestle': Nestle, 'ptemcee': Ptemcee,
-    'ptmcmcsampler': PTMCMCSampler, 'pymc3': Pymc3, 'pymultinest': Pymultinest,
-    'pypolychord': PyPolyChord, 'ultranest': Ultranest,
-    'fake_sampler': FakeSampler}
+    'bilby_mcmc': Bilby_MCMC, 'cpnest': Cpnest, 'dnest4': DNest4, 'dynamic_dynesty': DynamicDynesty,
+    'dynesty': Dynesty, 'emcee': Emcee,'kombine': Kombine, 'nessai': Nessai,
+    'nestle': Nestle, 'ptemcee': Ptemcee, 'ptmcmcsampler': PTMCMCSampler,
+    'pymc3': Pymc3, 'pymultinest': Pymultinest, 'pypolychord': PyPolyChord,
+    'ultranest': Ultranest, 'fake_sampler': FakeSampler}
 
 if command_line_args.sampler_help:
     sampler = command_line_args.sampler_help
@@ -55,7 +58,7 @@ def run_sampler(likelihood, priors=None, label='label', outdir='outdir',
     The primary interface to easy parameter estimation
 
     Parameters
-    ----------
+    ==========
     likelihood: `bilby.Likelihood`
         A `Likelihood` instance
     priors: `bilby.PriorDict`
@@ -90,9 +93,10 @@ def run_sampler(likelihood, priors=None, label='label', outdir='outdir',
         saving. For example, if `meta_data={dtype: 'signal'}`. Warning: in case
         of conflict with keys saved by bilby, the meta_data keys will be
         overwritten.
-    save: bool
+    save: bool, str
         If true, save the priors and results to disk.
         If hdf5, save as an hdf5 file instead of json.
+        If pickle or pkl, save as an pickle file instead of json.
     gzip: bool
         If true, and save is true, gzip the saved results file.
     result_class: bilby.core.result.Result, or child of
@@ -106,8 +110,8 @@ def run_sampler(likelihood, priors=None, label='label', outdir='outdir',
         All kwargs are passed directly to the samplers `run` function
 
     Returns
-    -------
-    result
+    =======
+    result: bilby.core.result.Result
         An object containing the results
     """
 
@@ -140,6 +144,7 @@ def run_sampler(likelihood, priors=None, label='label', outdir='outdir',
     if meta_data is None:
         meta_data = dict()
     meta_data['likelihood'] = likelihood.meta_data
+    meta_data["loaded_modules"] = loaded_modules_dict()
 
     if command_line_args.bilby_zero_likelihood_mode:
         from bilby.core.likelihood import ZeroLikelihood

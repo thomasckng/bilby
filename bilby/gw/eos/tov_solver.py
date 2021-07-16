@@ -1,37 +1,13 @@
 # Monica Rizzo, 2019
 
 import numpy as np
-from scipy.integrate import solve_ivp
 
 
 class IntegrateTOV:
     """Class that given an initial pressure a mass radius value and a k2-love number
-
-    Attributes:
-        eos (:obj:): .
-        attr2 (:obj:`int`, optional): Description of `attr2`.
-
     """
 
     def __init__(self, eos, eps_0):
-        """Example of docstring on the __init__ method.
-
-        The __init__ method may be documented in either the class level
-        docstring, or as a docstring on the __init__ method itself.
-
-        Either form is acceptable, but the two should not be mixed. Choose one
-        convention to document the __init__ method and be consistent with it.
-
-        Note:
-            Do not include the `self` parameter in the ``Args`` section.
-
-        Args:
-            param1 (str): Description of `param1`.
-            param2 (:obj:`int`, optional): Description of `param2`. Multiple
-                lines are supported.
-            param3 (:obj:`list` of :obj:`str`): Description of `param3`.
-
-        """
         self.eos = eos
         # determine central values
         pseudo_enthalpy0 = self.eos.pseudo_enthalpy_from_energy_density(eps_0)
@@ -134,6 +110,7 @@ class IntegrateTOV:
         """
         Evolves TOV+k2 equations and returns final quantities
         """
+        from scipy.integrate import solve_ivp
 
         # integration settings the same as in lalsimulation
         rel_err = 1e-4

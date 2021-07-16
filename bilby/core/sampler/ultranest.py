@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 
 import datetime
 import distutils.dir_util
@@ -6,7 +5,6 @@ import inspect
 import os
 import shutil
 import signal
-import tempfile
 import time
 
 import numpy as np
@@ -29,8 +27,8 @@ class Ultranest(NestedSampler):
     `ultranest.NestedSampler` will be used, otherwise the
     `ultranest.ReactiveNestedSampler` will be used.
 
-    Other Parameters
-    ----------------
+    Parameters
+    ==========
     num_live_points: int
         The number of live points, note this can also equivalently be given as
         one of [nlive, nlives, n_live_points, num_live_points]. If not given
@@ -62,7 +60,7 @@ class Ultranest(NestedSampler):
         log_interval=None,
         dlogz=None,
         max_iters=None,
-        update_interval_iter_fraction=0.2,
+        update_interval_volume_fraction=0.2,
         viz_callback=None,
         dKL=0.5,
         frac_remain=0.01,
@@ -233,7 +231,7 @@ class Ultranest(NestedSampler):
             ]
         else:
             keys = [
-                "update_interval_iter_fraction",
+                "update_interval_volume_fraction",
                 "update_interval_ncall",
                 "log_interval",
                 "show_status",
@@ -287,6 +285,7 @@ class Ultranest(NestedSampler):
         stepsampler = self.kwargs.pop("step_sampler", None)
 
         self._setup_run_directory()
+        self.kwargs["log_dir"] = self.kwargs.pop("outputfiles_basename")
         self._check_and_load_sampling_time_file()
 
         # use reactive nested sampler when no live points are given
@@ -325,30 +324,6 @@ class Ultranest(NestedSampler):
         self.calc_likelihood_count()
 
         return self.result
-
-    def _setup_run_directory(self):
-        """
-        If using a temporary directory, the output directory is moved to the
-        temporary directory and symlinked back.
-        """
-        if self.use_temporary_directory:
-            temporary_outputfiles_basename = tempfile.TemporaryDirectory().name
-            self.temporary_outputfiles_basename = temporary_outputfiles_basename
-
-            if os.path.exists(self.outputfiles_basename):
-                distutils.dir_util.copy_tree(
-                    self.outputfiles_basename, self.temporary_outputfiles_basename
-                )
-            check_directory_exists_and_if_not_mkdir(temporary_outputfiles_basename)
-
-            self.kwargs["log_dir"] = self.temporary_outputfiles_basename
-            logger.info(
-                "Using temporary file {}".format(temporary_outputfiles_basename)
-            )
-        else:
-            check_directory_exists_and_if_not_mkdir(self.outputfiles_basename)
-            self.kwargs["log_dir"] = self.outputfiles_basename
-            logger.info("Using output file {}".format(self.outputfiles_basename))
 
     def _clean_up_run_directory(self):
         if self.use_temporary_directory:
@@ -390,6 +365,8 @@ class Ultranest(NestedSampler):
         self.result.nested_samples = nested_samples
         self.result.log_evidence = out["logz"]
         self.result.log_evidence_err = out["logzerr"]
+        if self.kwargs["num_live_points"] is not None:
+            self.result.information_gain = np.power(out["logzerr"], 2) * self.kwargs["num_live_points"]
 
         self.result.outputfiles_basename = self.outputfiles_basename
         self.result.sampling_time = datetime.timedelta(seconds=self.total_sampling_time)

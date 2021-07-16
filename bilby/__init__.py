@@ -16,7 +16,6 @@ https://lscsoft.docs.ligo.org/bilby/installation.html.
 """
 
 
-from __future__ import absolute_import
 import sys
 
 from . import core, gw, hyper
@@ -30,7 +29,7 @@ __version__ = utils.get_version_information()
 
 if sys.version_info < (3,):
     raise ImportError(
-"""You are running bilby 0.6.4 on Python 2
+"""You are running bilby >= 0.6.4 on Python 2
 
 Bilby 0.6.4 and above are no longer compatible with Python 2, and you still
 ended up with this version installed. That's unfortunate; sorry about that.

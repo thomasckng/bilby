@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 
 import numpy as np
 from pandas import DataFrame
@@ -14,8 +13,8 @@ class Nestle(NestedSampler):
     that function for further help. Under Other Parameters, we list commonly
     used kwargs and the bilby defaults
 
-    Other Parameters
-    ----------------
+    Parameters
+    ==========
     npoints: int
         The number of live points, note this can also equivalently be given as
         one of [nlive, nlives, n_live_points]
@@ -52,7 +51,7 @@ class Nestle(NestedSampler):
         """ Runs Nestle sampler with given kwargs and returns the result
 
         Returns
-        -------
+        =======
         bilby.core.result.Result: Packaged information about the result
 
         """
@@ -74,6 +73,7 @@ class Nestle(NestedSampler):
             sorted_samples=self.result.samples)
         self.result.log_evidence = out.logz
         self.result.log_evidence_err = out.logzerr
+        self.result.information_gain = out.h
         self.calc_likelihood_count()
         return self.result
 
@@ -83,7 +83,7 @@ class Nestle(NestedSampler):
         kwargs without actually running to the end
 
         Returns
-        -------
+        =======
         bilby.core.result.Result: Dummy container for sampling results.
 
         """

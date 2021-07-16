@@ -1,4 +1,3 @@
-from __future__ import absolute_import, print_function
 
 from collections import OrderedDict
 from distutils.version import StrictVersion
@@ -21,8 +20,8 @@ class Pymc3(MCMCSampler):
     class for further help. Under Other Parameters, we list commonly used
     kwargs and the bilby, or where appropriate, PyMC3 defaults.
 
-    Other Parameters
-    ----------------
+    Parameters
+    ==========
     draws: int, (1000)
         The number of sample draws from the posterior per chain.
     chains: int, (2)

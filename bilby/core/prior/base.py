@@ -5,7 +5,6 @@ import re
 
 import numpy as np
 import scipy.stats
-from scipy.integrate import cumtrapz
 from scipy.interpolate import interp1d
 
 from bilby.core.utils import infer_args_from_method, BilbyJsonEncoder, decode_bilby_json, logger, \
@@ -20,7 +19,7 @@ class Prior(object):
         """ Implements a Prior object
 
         Parameters
-        ----------
+        ==========
         name: str, optional
             Name associated with prior.
         latex_label: str, optional
@@ -57,27 +56,58 @@ class Prior(object):
         """Overrides the __call__ special method. Calls the sample method.
 
         Returns
-        -------
+        =======
         float: The return value of the sample method.
         """
         return self.sample()
 
     def __eq__(self, other):
+        """
+        Test equality of two prior objects.
+
+        Returns true iff:
+
+        - The class of the two priors are the same
+        - Both priors have the same keys in the __dict__ attribute
+        - The instantiation arguments match
+
+        We don't check that all entries the the __dict__ attribute
+        are equal as some attributes are variable for conditional
+        priors.
+
+        Parameters
+        ==========
+        other: Prior
+            The prior to compare with
+
+        Returns
+        =======
+        bool
+            Whether the priors are equivalent
+
+        Notes
+        =====
+        A special case is made for :code `scipy.stats.beta`: instances.
+        It may be possible to remove this as we now only check instantiation
+        arguments.
+
+        """
         if self.__class__ != other.__class__:
             return False
         if sorted(self.__dict__.keys()) != sorted(other.__dict__.keys()):
             return False
-        for key in self.__dict__:
+        this_dict = self.get_instantiation_dict()
+        other_dict = other.get_instantiation_dict()
+        for key in this_dict:
             if key == "least_recently_sampled":
-                # ignore sample drawn from prior in comparison
                 continue
-            if type(self.__dict__[key]) is np.ndarray:
-                if not np.array_equal(self.__dict__[key], other.__dict__[key]):
+            if isinstance(this_dict[key], np.ndarray):
+                if not np.array_equal(this_dict[key], other_dict[key]):
                     return False
-            elif isinstance(self.__dict__[key], type(scipy.stats.beta(1., 1.))):
+            elif isinstance(this_dict[key], type(scipy.stats.beta(1., 1.))):
                 continue
             else:
-                if not self.__dict__[key] == other.__dict__[key]:
+                if not this_dict[key] == other_dict[key]:
                     return False
         return True
 
@@ -85,12 +115,12 @@ class Prior(object):
         """Draw a sample from the prior
 
         Parameters
-        ----------
+        ==========
         size: int or tuple of ints, optional
             See numpy.random.uniform docs
 
         Returns
-        -------
+        =======
         float: A random number between 0 and 1, rescaled to match the distribution of this Prior
 
         """
@@ -104,12 +134,12 @@ class Prior(object):
         This should be overwritten by each subclass.
 
         Parameters
-        ----------
+        ==========
         val: Union[float, int, array_like]
             A random number between 0 and 1
 
         Returns
-        -------
+        =======
         None
 
         """
@@ -119,11 +149,11 @@ class Prior(object):
         """Return the prior probability of val, this should be overwritten
 
         Parameters
-        ----------
+        ==========
         val: Union[float, int, array_like]
 
         Returns
-        -------
+        =======
         np.nan
 
         """
@@ -131,6 +161,7 @@ class Prior(object):
 
     def cdf(self, val):
         """ Generic method to calculate CDF, can be overwritten in subclass """
+        from scipy.integrate import cumtrapz
         if np.any(np.isinf([self.minimum, self.maximum])):
             raise ValueError(
                 "Unable to use the generic CDF calculation for priors with"
@@ -146,46 +177,30 @@ class Prior(object):
         """Return the prior ln probability of val, this should be overwritten
 
         Parameters
-        ----------
+        ==========
         val: Union[float, int, array_like]
 
         Returns
-        -------
+        =======
         np.nan
 
         """
-        return np.log(self.prob(val))
+        with np.errstate(divide='ignore'):
+            return np.log(self.prob(val))
 
     def is_in_prior_range(self, val):
         """Returns True if val is in the prior boundaries, zero otherwise
 
         Parameters
-        ----------
+        ==========
         val: Union[float, int, array_like]
 
         Returns
-        -------
+        =======
         np.nan
 
         """
         return (val >= self.minimum) & (val <= self.maximum)
-
-    @staticmethod
-    def test_valid_for_rescaling(val):
-        """Test if 0 < val < 1
-
-        Parameters
-        ----------
-        val: Union[float, int, array_like]
-
-        Raises
-        -------
-        ValueError: If val is not between 0 and 1
-        """
-        valarray = np.atleast_1d(val)
-        tests = (valarray < 0) + (valarray > 1)
-        if np.any(tests):
-            raise ValueError("Number to be rescaled should be in [0, 1]")
 
     def __repr__(self):
         """Overrides the special method __repr__.
@@ -194,7 +209,7 @@ class Prior(object):
         Works correctly for all child classes
 
         Returns
-        -------
+        =======
         str: A string representation of this instance
 
         """
@@ -224,7 +239,7 @@ class Prior(object):
 
 
         Returns
-        -------
+        =======
         bool: Whether it's fixed or not!
 
         """
@@ -237,7 +252,7 @@ class Prior(object):
         Draws from a set of default labels if no label is given
 
         Returns
-        -------
+        =======
         str: A latex representation for this prior
 
         """
@@ -281,6 +296,10 @@ class Prior(object):
     @maximum.setter
     def maximum(self, maximum):
         self._maximum = maximum
+
+    @property
+    def width(self):
+        return self.maximum - self.minimum
 
     def get_instantiation_dict(self):
         subclass_args = infer_args_from_method(self.__init__)
@@ -392,17 +411,17 @@ class Prior(object):
 
 
         Parameters
-        ----------
+        ==========
         val: str
-            The string version of the agument
+            The string version of the argument
 
         Returns
-        -------
+        =======
         val: object
             The parsed version of the argument.
 
         Raises
-        ------
+        ======
         TypeError:
             If val cannot be parsed as described above.
         """
@@ -443,9 +462,6 @@ class Constraint(Prior):
 
     def prob(self, val):
         return (val > self.minimum) & (val < self.maximum)
-
-    def ln_prob(self, val):
-        return np.log((val > self.minimum) & (val < self.maximum))
 
 
 class PriorException(Exception):

@@ -1,6 +1,6 @@
-from __future__ import absolute_import
 
 import numpy as np
+
 from .base_sampler import Sampler
 from ..result import read_in_result
 
@@ -13,7 +13,7 @@ class FakeSampler(Sampler):
     See base class for parameters. Added parameters are described below.
 
     Parameters
-    ----------
+    ==========
     sample_file: str
         A string pointing to the posterior data file to be loaded.
     """

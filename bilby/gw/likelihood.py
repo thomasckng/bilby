@@ -1,32 +1,25 @@
-from __future__ import division
 
-import gc
 import os
 import json
 import copy
 
 import numpy as np
-import scipy.integrate as integrate
-from scipy.interpolate import interp1d
-
-try:
-    from scipy.special import logsumexp
-except ImportError:
-    from scipy.misc import logsumexp
-from scipy.special import i0e
+import pandas as pd
+from scipy.special import logsumexp
 
 from ..core.likelihood import Likelihood
 from ..core.utils import BilbyJsonEncoder, decode_bilby_json
 from ..core.utils import (
     logger, UnsortedInterp2d, create_frequency_series, create_time_series,
     speed_of_light, radius_of_earth)
-from ..core.prior import Interped, Prior, Uniform
-from .detector import InterferometerList, get_empty_interferometer
+from ..core.prior import Interped, Prior, Uniform, PriorDict, DeltaFunction
+from .detector import InterferometerList, get_empty_interferometer, calibration
 from .prior import BBHPriorDict, CBCPriorDict, Cosmological
 from .source import lal_binary_black_hole
 from .utils import (
-    noise_weighted_inner_product, build_roq_weights, blockwise_dot_product,
-    zenith_azimuth_to_ra_dec)
+    noise_weighted_inner_product, build_roq_weights, zenith_azimuth_to_ra_dec,
+    ln_i0
+)
 from .waveform_generator import WaveformGenerator
 from collections import namedtuple
 
@@ -39,9 +32,8 @@ class GravitationalWaveTransient(Likelihood):
     domain assuming a colored Gaussian noise model described by a power
     spectral density. See Thrane & Talbot (2019), arxiv.org/abs/1809.02293.
 
-
     Parameters
-    ----------
+    ==========
     interferometers: list, bilby.gw.detector.InterferometerList
         A list of `bilby.detector.Interferometer` instances - contains the
         detector data and power spectral densities
@@ -66,8 +58,13 @@ class GravitationalWaveTransient(Likelihood):
         If true, marginalize over phase in the likelihood.
         This is done analytically using a Bessel function.
         The phase prior is set to be a delta function at phase=0.
+    calibration_marginalization: bool, optional
+        If true, marginalize over calibration response curves in the likelihood.
+        This is done numerically over a number of calibration response curve realizations.
     priors: dict, optional
         If given, used in the distance and phase marginalization.
+        Warning: when using marginalisation the dict is overwritten which will change the
+        the dict you are passing in. If this behaviour is undesired, pass `priors.copy()`.
     distance_marginalization_lookup_table: (dict, str), optional
         If a dict, dictionary containing the lookup_table, distance_array,
         (distance) prior_array, and reference_distance used to construct
@@ -76,6 +73,19 @@ class GravitationalWaveTransient(Likelihood):
         The lookup table is stored after construction in either the
         provided string or a default location:
         '.distance_marginalization_lookup_dmin{}_dmax{}_n{}.npz'
+    calibration_lookup_table: dict, optional
+        If a dict, contains the arrays over which to marginalize for each interferometer or the filepaths of the
+        calibration files.
+        If not provided, but calibration_marginalization is used, then the appropriate file is created to
+        contain the curves.
+    number_of_response_curves: int, optional
+        Number of curves from the calibration lookup table to use.
+        Default is 1000.
+    starting_index: int, optional
+        Sets the index for the first realization of the calibration curve to be considered.
+        This, coupled with number_of_response_curves, allows for restricting the set of curves used. This can be used
+        when dealing with large frequency arrays to split the calculation into sections.
+        Defaults to 0.
     jitter_time: bool, optional
         Whether to introduce a `time_jitter` parameter. This avoids either
         missing the likelihood peak, or introducing biases in the
@@ -83,19 +93,22 @@ class GravitationalWaveTransient(Likelihood):
         Default is False, however using this parameter is strongly encouraged.
     reference_frame: (str, bilby.gw.detector.InterferometerList, list), optional
         Definition of the reference frame for the sky location.
-        - "sky": sample in RA/dec, this is the default
-        - e.g., "H1L1", ["H1", "L1"], InterferometerList(["H1", "L1"]):
+
+        - :code:`sky`: sample in RA/dec, this is the default
+        - e.g., :code:`"H1L1", ["H1", "L1"], InterferometerList(["H1", "L1"])`:
           sample in azimuth and zenith, `azimuth` and `zenith` defined in the
           frame where the z-axis is aligned the the vector connecting H1
           and L1.
+
     time_reference: str, optional
         Name of the reference for the sampled time parameter.
-        - "geocent"/"geocenter": sample in the time at the Earth's center,
-          this is the default
-        - e.g., "H1": sample in the time of arrival at H1
+
+        - :code:`geocent`/:code:`geocenter`: sample in the time at the
+          Earth's center, this is the default
+        - e.g., :code:`H1`: sample in the time of arrival at H1
 
     Returns
-    -------
+    =======
     Likelihood: `bilby.core.likelihood.Likelihood`
         A likelihood object, able to compute the likelihood of the data given
         some model parameters
@@ -106,13 +119,16 @@ class GravitationalWaveTransient(Likelihood):
                                  ['d_inner_h',
                                   'optimal_snr_squared',
                                   'complex_matched_filter_snr',
+                                  'd_inner_h_array',
+                                  'optimal_snr_squared_array',
                                   'd_inner_h_squared_tc_array'])
 
     def __init__(
         self, interferometers, waveform_generator, time_marginalization=False,
-        distance_marginalization=False, phase_marginalization=False, priors=None,
-        distance_marginalization_lookup_table=None, jitter_time=True,
-        reference_frame="sky", time_reference="geocenter"
+        distance_marginalization=False, phase_marginalization=False, calibration_marginalization=False, priors=None,
+        distance_marginalization_lookup_table=None, calibration_lookup_table=None,
+        number_of_response_curves=1000, starting_index=0, jitter_time=True, reference_frame="sky",
+        time_reference="geocenter"
     ):
 
         self.waveform_generator = waveform_generator
@@ -121,6 +137,7 @@ class GravitationalWaveTransient(Likelihood):
         self.time_marginalization = time_marginalization
         self.distance_marginalization = distance_marginalization
         self.phase_marginalization = phase_marginalization
+        self.calibration_marginalization = calibration_marginalization
         self.priors = priors
         self._check_set_duration_and_sampling_frequency_of_waveform_generator()
         self.jitter_time = jitter_time
@@ -142,8 +159,12 @@ class GravitationalWaveTransient(Likelihood):
             priors['geocent_time'] = float(self.interferometers.start_time)
             if self.jitter_time:
                 priors['time_jitter'] = Uniform(
-                    minimum=- self._delta_tc / 2, maximum=self._delta_tc / 2,
-                    boundary='periodic')
+                    minimum=- self._delta_tc / 2,
+                    maximum=self._delta_tc / 2,
+                    boundary='periodic',
+                    name="time_jitter",
+                    latex_label="$t_j$"
+                )
             self._marginalized_parameters.append('geocent_time')
         elif self.jitter_time:
             logger.debug(
@@ -153,8 +174,6 @@ class GravitationalWaveTransient(Likelihood):
 
         if self.phase_marginalization:
             self._check_marginalized_prior_is_set(key='phase')
-            self._bessel_function_interped = None
-            self._setup_phase_marginalization()
             priors['phase'] = float(0)
             self._marginalized_parameters.append('phase')
 
@@ -167,6 +186,10 @@ class GravitationalWaveTransient(Likelihood):
             self.distance_prior_array = np.array(
                 [self.priors['luminosity_distance'].prob(distance)
                  for distance in self._distance_array])
+            self._ref_dist = self.priors['luminosity_distance'].rescale(0.5)
+            if self.phase_marginalization:
+                max_bound = np.ceil(10 + np.log10(self._dist_multiplier))
+                self._setup_phase_marginalization(max_bound=max_bound)
             self._setup_distance_marginalization(
                 distance_marginalization_lookup_table)
             for key in ['redshift', 'comoving_distance']:
@@ -175,11 +198,19 @@ class GravitationalWaveTransient(Likelihood):
             priors['luminosity_distance'] = float(self._ref_dist)
             self._marginalized_parameters.append('luminosity_distance')
 
+        if self.calibration_marginalization:
+            self.number_of_response_curves = number_of_response_curves
+            self.starting_index = starting_index
+            self._setup_calibration_marginalization(calibration_lookup_table)
+            self._marginalized_parameters.append('recalib_index')
+
     def __repr__(self):
         return self.__class__.__name__ + '(interferometers={},\n\twaveform_generator={},\n\ttime_marginalization={}, ' \
-                                         'distance_marginalization={}, phase_marginalization={}, priors={})'\
+                                         'distance_marginalization={}, phase_marginalization={}, '\
+                                         'calibration_marginalization={}, priors={})'\
             .format(self.interferometers, self.waveform_generator, self.time_marginalization,
-                    self.distance_marginalization, self.phase_marginalization, self.priors)
+                    self.distance_marginalization, self.phase_marginalization, self.calibration_marginalization,
+                    self.priors)
 
     def _check_set_duration_and_sampling_frequency_of_waveform_generator(self):
         """ Check the waveform_generator has the same duration and
@@ -207,7 +238,7 @@ class GravitationalWaveTransient(Likelihood):
         Compute the snrs
 
         Parameters
-        ----------
+        ==========
         waveform_polarizations: dict
             A dictionary of waveform polarizations and the corresponding array
         interferometer: bilby.gw.detector.Interferometer
@@ -216,23 +247,59 @@ class GravitationalWaveTransient(Likelihood):
         """
         signal = interferometer.get_detector_response(
             waveform_polarizations, self.parameters)
+        _mask = interferometer.frequency_mask
+
+        if 'recalib_index' in self.parameters:
+            signal[_mask] *= self.calibration_draws[interferometer.name][int(self.parameters['recalib_index'])]
+
         d_inner_h = interferometer.inner_product(signal=signal)
         optimal_snr_squared = interferometer.optimal_snr_squared(signal=signal)
         complex_matched_filter_snr = d_inner_h / (optimal_snr_squared**0.5)
 
-        if self.time_marginalization:
-            d_inner_h_squared_tc_array =\
+        d_inner_h_array = None
+        optimal_snr_squared_array = None
+
+        if self.time_marginalization and self.calibration_marginalization:
+
+            d_inner_h_integrand = np.tile(
+                interferometer.frequency_domain_strain.conjugate() * signal /
+                interferometer.power_spectral_density_array, (self.number_of_response_curves, 1)).T
+
+            d_inner_h_integrand[_mask] *= self.calibration_draws[interferometer.name].T
+
+            d_inner_h_array =\
+                4 / self.waveform_generator.duration * np.fft.fft(
+                    d_inner_h_integrand[0:-1], axis=0).T
+
+            optimal_snr_squared_integrand = 4. / self.waveform_generator.duration *\
+                np.abs(signal)**2 / interferometer.power_spectral_density_array
+            optimal_snr_squared_array = np.dot(optimal_snr_squared_integrand[_mask],
+                                               self.calibration_abs_draws[interferometer.name].T)
+
+        elif self.time_marginalization and not self.calibration_marginalization:
+            d_inner_h_array =\
                 4 / self.waveform_generator.duration * np.fft.fft(
                     signal[0:-1] *
                     interferometer.frequency_domain_strain.conjugate()[0:-1] /
                     interferometer.power_spectral_density_array[0:-1])
-        else:
-            d_inner_h_squared_tc_array = None
+
+        elif self.calibration_marginalization and ('recalib_index' not in self.parameters):
+            d_inner_h_integrand = 4. / self.waveform_generator.duration * \
+                interferometer.frequency_domain_strain.conjugate() * signal / \
+                interferometer.power_spectral_density_array
+            d_inner_h_array = np.dot(d_inner_h_integrand[_mask], self.calibration_draws[interferometer.name].T)
+
+            optimal_snr_squared_integrand = 4. / self.waveform_generator.duration *\
+                np.abs(signal)**2 / interferometer.power_spectral_density_array
+            optimal_snr_squared_array = np.dot(optimal_snr_squared_integrand[_mask],
+                                               self.calibration_abs_draws[interferometer.name].T)
 
         return self._CalculatedSNRs(
             d_inner_h=d_inner_h, optimal_snr_squared=optimal_snr_squared,
             complex_matched_filter_snr=complex_matched_filter_snr,
-            d_inner_h_squared_tc_array=d_inner_h_squared_tc_array)
+            d_inner_h_array=d_inner_h_array,
+            optimal_snr_squared_array=optimal_snr_squared_array,
+            d_inner_h_squared_tc_array=None)
 
     def _check_marginalized_prior_is_set(self, key):
         if key in self.priors and self.priors[key].is_fixed:
@@ -299,12 +366,26 @@ class GravitationalWaveTransient(Likelihood):
         d_inner_h = 0.
         optimal_snr_squared = 0.
         complex_matched_filter_snr = 0.
-        if self.time_marginalization:
+
+        if self.time_marginalization and self.calibration_marginalization:
             if self.jitter_time:
                 self.parameters['geocent_time'] += self.parameters['time_jitter']
-            d_inner_h_tc_array = np.zeros(
-                self.interferometers.frequency_array[0:-1].shape,
+
+            d_inner_h_array = np.zeros(
+                (self.number_of_response_curves, len(self.interferometers.frequency_array[0:-1])),
                 dtype=np.complex128)
+            optimal_snr_squared_array = np.zeros(self.number_of_response_curves, dtype=np.complex128)
+
+        elif self.time_marginalization:
+            if self.jitter_time:
+                self.parameters['geocent_time'] += self.parameters['time_jitter']
+            d_inner_h_array = np.zeros(
+                len(self.interferometers.frequency_array[0:-1]),
+                dtype=np.complex128)
+
+        elif self.calibration_marginalization:
+            d_inner_h_array = np.zeros(self.number_of_response_curves, dtype=np.complex128)
+            optimal_snr_squared_array = np.zeros(self.number_of_response_curves, dtype=np.complex128)
 
         for interferometer in self.interferometers:
             per_detector_snr = self.calculate_snrs(
@@ -315,12 +396,27 @@ class GravitationalWaveTransient(Likelihood):
             optimal_snr_squared += np.real(per_detector_snr.optimal_snr_squared)
             complex_matched_filter_snr += per_detector_snr.complex_matched_filter_snr
 
-            if self.time_marginalization:
-                d_inner_h_tc_array += per_detector_snr.d_inner_h_squared_tc_array
+            if self.time_marginalization or self.calibration_marginalization:
+                d_inner_h_array += per_detector_snr.d_inner_h_array
 
-        if self.time_marginalization:
+            if self.calibration_marginalization:
+                optimal_snr_squared_array += per_detector_snr.optimal_snr_squared_array
+
+        if self.calibration_marginalization and self.time_marginalization:
+            log_l = self.time_and_calibration_marginalized_likelihood(
+                d_inner_h_array=d_inner_h_array,
+                h_inner_h=optimal_snr_squared_array)
+            if self.jitter_time:
+                self.parameters['geocent_time'] -= self.parameters['time_jitter']
+
+        elif self.calibration_marginalization:
+            log_l = self.calibration_marginalized_likelihood(
+                d_inner_h_calibration_array=d_inner_h_array,
+                h_inner_h=optimal_snr_squared_array)
+
+        elif self.time_marginalization:
             log_l = self.time_marginalized_likelihood(
-                d_inner_h_tc_array=d_inner_h_tc_array,
+                d_inner_h_tc_array=d_inner_h_array,
                 h_inner_h=optimal_snr_squared)
             if self.jitter_time:
                 self.parameters['geocent_time'] -= self.parameters['time_jitter']
@@ -345,23 +441,33 @@ class GravitationalWaveTransient(Likelihood):
 
         See Eq. (C29-C32) of https://arxiv.org/abs/1809.02293
 
-        Return
-        ------
+        Returns
+        =======
         sample: dict
             Returns the parameters with new samples.
 
         Notes
-        -----
+        =====
         This involves a deepcopy of the signal to avoid issues with waveform
         caching, as the signal is overwritten in place.
         """
         if any([self.phase_marginalization, self.distance_marginalization,
-                self.time_marginalization]):
+                self.time_marginalization, self.calibration_marginalization]):
             signal_polarizations = copy.deepcopy(
                 self.waveform_generator.frequency_domain_strain(
                     self.parameters))
         else:
             return self.parameters
+
+        if self.calibration_marginalization and self.time_marginalization:
+            raise AttributeError(
+                "Cannot use time and calibration marginalization simultaneously for regeneration at the moment!"
+                "The matrix manipulation has not been tested.")
+
+        if self.calibration_marginalization:
+            new_calibration = self.generate_calibration_sample_from_marginalized_likelihood(
+                signal_polarizations=signal_polarizations)
+            self.parameters['recalib_index'] = new_calibration
         if self.time_marginalization:
             new_time = self.generate_time_sample_from_marginalized_likelihood(
                 signal_polarizations=signal_polarizations)
@@ -376,15 +482,11 @@ class GravitationalWaveTransient(Likelihood):
             self.parameters['phase'] = new_phase
         return self.parameters.copy()
 
-    def generate_time_sample_from_marginalized_likelihood(
+    def generate_calibration_sample_from_marginalized_likelihood(
             self, signal_polarizations=None):
         """
-        Generate a single sample from the posterior distribution for coalescence
-        time when using a likelihood which explicitly marginalises over time.
-
-        In order to resolve the posterior we artifically upsample to 16kHz.
-
-        See Eq. (C29-C32) of https://arxiv.org/abs/1809.02293
+        Generate a single sample from the posterior distribution for the set of calibration response curves when
+        explicitly marginalizing over the calibration uncertainty.
 
         Parameters
         ----------
@@ -393,6 +495,42 @@ class GravitationalWaveTransient(Likelihood):
 
         Returns
         -------
+        new_calibration: dict
+            Sample set from the calibration posterior
+        """
+        if 'recalib_index' in self.parameters:
+            self.parameters.pop('recalib_index')
+        self.parameters.update(self.get_sky_frame_parameters())
+        if signal_polarizations is None:
+            signal_polarizations = \
+                self.waveform_generator.frequency_domain_strain(self.parameters)
+
+        log_like = self.get_calibration_log_likelihoods(signal_polarizations=signal_polarizations)
+
+        calibration_post = np.exp(log_like - max(log_like))
+        calibration_post /= np.sum(calibration_post)
+
+        new_calibration = np.random.choice(self.number_of_response_curves, p=calibration_post)
+
+        return new_calibration
+
+    def generate_time_sample_from_marginalized_likelihood(
+            self, signal_polarizations=None):
+        """
+        Generate a single sample from the posterior distribution for coalescence
+        time when using a likelihood which explicitly marginalises over time.
+
+        In order to resolve the posterior we artificially upsample to 16kHz.
+
+        See Eq. (C29-C32) of https://arxiv.org/abs/1809.02293
+
+        Parameters
+        ==========
+        signal_polarizations: dict, optional
+            Polarizations modes of the template.
+
+        Returns
+        =======
         new_time: float
             Sample from the time posterior.
         """
@@ -415,10 +553,10 @@ class GravitationalWaveTransient(Likelihood):
         times = times[in_prior]
 
         n_time_steps = int(self.waveform_generator.duration * 16384)
-        d_inner_h = np.zeros(len(times), dtype=np.complex)
+        d_inner_h = np.zeros(len(times), dtype=complex)
         psd = np.ones(n_time_steps)
-        signal_long = np.zeros(n_time_steps, dtype=np.complex)
-        data = np.zeros(n_time_steps, dtype=np.complex)
+        signal_long = np.zeros(n_time_steps, dtype=complex)
+        data = np.zeros(n_time_steps, dtype=complex)
         h_inner_h = np.zeros(1)
         for ifo in self.interferometers:
             ifo_length = len(ifo.frequency_domain_strain)
@@ -435,8 +573,7 @@ class GravitationalWaveTransient(Likelihood):
             time_log_like = self.distance_marginalized_likelihood(
                 d_inner_h, h_inner_h)
         elif self.phase_marginalization:
-            time_log_like = (self._bessel_function_interped(abs(d_inner_h)) -
-                             h_inner_h.real / 2)
+            time_log_like = ln_i0(abs(d_inner_h)) - h_inner_h.real / 2
         else:
             time_log_like = (d_inner_h.real - h_inner_h.real / 2)
 
@@ -463,14 +600,14 @@ class GravitationalWaveTransient(Likelihood):
         See Eq. (C29-C32) of https://arxiv.org/abs/1809.02293
 
         Parameters
-        ----------
+        ==========
         signal_polarizations: dict, optional
             Polarizations modes of the template.
             Note: These are rescaled in place after the distance sample is
-                  generated to allow further parameter reconstruction to occur.
+            generated to allow further parameter reconstruction to occur.
 
         Returns
-        -------
+        =======
         new_distance: float
             Sample from the distance posterior.
         """
@@ -478,6 +615,7 @@ class GravitationalWaveTransient(Likelihood):
         if signal_polarizations is None:
             signal_polarizations = \
                 self.waveform_generator.frequency_domain_strain(self.parameters)
+
         d_inner_h, h_inner_h = self._calculate_inner_products(signal_polarizations)
 
         d_inner_h_dist = (
@@ -490,8 +628,9 @@ class GravitationalWaveTransient(Likelihood):
 
         if self.phase_marginalization:
             distance_log_like = (
-                self._bessel_function_interped(abs(d_inner_h_dist)) -
-                h_inner_h_dist.real / 2)
+                ln_i0(abs(d_inner_h_dist)) -
+                h_inner_h_dist.real / 2
+            )
         else:
             distance_log_like = (d_inner_h_dist.real - h_inner_h_dist.real / 2)
 
@@ -524,17 +663,17 @@ class GravitationalWaveTransient(Likelihood):
         See Eq. (C29-C32) of https://arxiv.org/abs/1809.02293
 
         Parameters
-        ----------
+        ==========
         signal_polarizations: dict, optional
             Polarizations modes of the template.
 
         Returns
-        -------
+        =======
         new_phase: float
             Sample from the phase posterior.
 
         Notes
-        -----
+        =====
         This is only valid when assumes that mu(phi) \propto exp(-2i phi).
         """
         self.parameters.update(self.get_sky_frame_parameters())
@@ -557,12 +696,17 @@ class GravitationalWaveTransient(Likelihood):
             d_inner_h_ref = np.abs(d_inner_h_ref)
         else:
             d_inner_h_ref = np.real(d_inner_h_ref)
+
         return self._interp_dist_margd_loglikelihood(
             d_inner_h_ref, h_inner_h_ref)
 
     def phase_marginalized_likelihood(self, d_inner_h, h_inner_h):
-        d_inner_h = self._bessel_function_interped(abs(d_inner_h))
-        return d_inner_h - h_inner_h / 2
+        d_inner_h = ln_i0(abs(d_inner_h))
+
+        if self.calibration_marginalization and self.time_marginalization:
+            return d_inner_h - np.outer(h_inner_h, np.ones(np.shape(d_inner_h)[1])) / 2
+        else:
+            return d_inner_h - h_inner_h / 2
 
     def time_marginalized_likelihood(self, d_inner_h_tc_array, h_inner_h):
         if self.distance_marginalization:
@@ -580,6 +724,81 @@ class GravitationalWaveTransient(Likelihood):
         time_prior_array = self.priors['geocent_time'].prob(times) * self._delta_tc
         return logsumexp(log_l_tc_array, b=time_prior_array)
 
+    def time_and_calibration_marginalized_likelihood(self, d_inner_h_array, h_inner_h):
+        times = self._times
+        if self.jitter_time:
+            times = self._times + self.parameters['time_jitter']
+
+        _time_prior = self.priors['geocent_time']
+        time_mask = np.logical_and((times >= _time_prior.minimum), (times <= _time_prior.maximum))
+        times = times[time_mask]
+        time_probs = self.priors['geocent_time'].prob(times) * self._delta_tc
+
+        d_inner_h_array = d_inner_h_array[:, time_mask]
+        h_inner_h = h_inner_h
+
+        if self.distance_marginalization:
+            log_l_array = self.distance_marginalized_likelihood(
+                d_inner_h=d_inner_h_array, h_inner_h=h_inner_h)
+        elif self.phase_marginalization:
+            log_l_array = self.phase_marginalized_likelihood(
+                d_inner_h=d_inner_h_array,
+                h_inner_h=h_inner_h)
+        else:
+            log_l_array = np.real(d_inner_h_array) - np.outer(h_inner_h, np.ones(np.shape(d_inner_h_array)[1])) / 2
+
+        prior_array = np.outer(time_probs, 1. / self.number_of_response_curves * np.ones(len(h_inner_h))).T
+
+        return logsumexp(log_l_array, b=prior_array)
+
+    def get_calibration_log_likelihoods(self, signal_polarizations=None):
+        self.parameters.update(self.get_sky_frame_parameters())
+        if signal_polarizations is None:
+            signal_polarizations =\
+                self.waveform_generator.frequency_domain_strain(self.parameters)
+
+        d_inner_h = 0.
+        optimal_snr_squared = 0.
+        complex_matched_filter_snr = 0.
+        d_inner_h_array = np.zeros(self.number_of_response_curves, dtype=np.complex128)
+        optimal_snr_squared_array = np.zeros(self.number_of_response_curves, dtype=np.complex128)
+
+        for interferometer in self.interferometers:
+            per_detector_snr = self.calculate_snrs(
+                waveform_polarizations=signal_polarizations,
+                interferometer=interferometer)
+
+            d_inner_h += per_detector_snr.d_inner_h
+            optimal_snr_squared += np.real(per_detector_snr.optimal_snr_squared)
+            complex_matched_filter_snr += per_detector_snr.complex_matched_filter_snr
+            d_inner_h_array += per_detector_snr.d_inner_h_array
+            optimal_snr_squared_array += per_detector_snr.optimal_snr_squared_array
+
+        if self.distance_marginalization:
+            log_l_cal_array = self.distance_marginalized_likelihood(
+                d_inner_h=d_inner_h_array, h_inner_h=optimal_snr_squared_array)
+        elif self.phase_marginalization:
+            log_l_cal_array = self.phase_marginalized_likelihood(
+                d_inner_h=d_inner_h_array,
+                h_inner_h=optimal_snr_squared_array)
+        else:
+            log_l_cal_array = np.real(d_inner_h_array - optimal_snr_squared_array / 2)
+
+        return log_l_cal_array
+
+    def calibration_marginalized_likelihood(self, d_inner_h_calibration_array, h_inner_h):
+        if self.distance_marginalization:
+            log_l_cal_array = self.distance_marginalized_likelihood(
+                d_inner_h=d_inner_h_calibration_array, h_inner_h=h_inner_h)
+        elif self.phase_marginalization:
+            log_l_cal_array = self.phase_marginalized_likelihood(
+                d_inner_h=d_inner_h_calibration_array,
+                h_inner_h=h_inner_h)
+        else:
+            log_l_cal_array = np.real(d_inner_h_calibration_array - h_inner_h / 2)
+
+        return logsumexp(log_l_cal_array) - np.log(self.number_of_response_curves)
+
     def _setup_rho(self, d_inner_h, optimal_snr_squared):
         optimal_snr_squared_ref = (optimal_snr_squared.real *
                                    self.parameters['luminosity_distance'] ** 2 /
@@ -596,9 +815,9 @@ class GravitationalWaveTransient(Likelihood):
         return self._distance_array[1] - self._distance_array[0]
 
     @property
-    def _ref_dist(self):
-        """ Smallest distance contained in priors """
-        return self._distance_array[0]
+    def _dist_multiplier(self):
+        ''' Maximum value of ref_dist/dist_array '''
+        return self._ref_dist / self._distance_array[0]
 
     @property
     def _optimal_snr_squared_ref_array(self):
@@ -632,7 +851,7 @@ class GravitationalWaveTransient(Likelihood):
             self._create_lookup_table()
         self._interp_dist_margd_loglikelihood = UnsortedInterp2d(
             self._d_inner_h_ref_array, self._optimal_snr_squared_ref_array,
-            self._dist_margd_loglikelihood_array, kind='cubic')
+            self._dist_margd_loglikelihood_array, kind='cubic', fill_value=-np.inf)
 
     @property
     def cached_lookup_table_filename(self):
@@ -693,32 +912,45 @@ class GravitationalWaveTransient(Likelihood):
 
     def _create_lookup_table(self):
         """ Make the lookup table """
+        from tqdm.auto import tqdm
         logger.info('Building lookup table for distance marginalisation.')
 
         self._dist_margd_loglikelihood_array = np.zeros((400, 800))
-        for ii, optimal_snr_squared_ref in enumerate(self._optimal_snr_squared_ref_array):
-            optimal_snr_squared_array = (
-                optimal_snr_squared_ref * self._ref_dist ** 2. /
-                self._distance_array ** 2)
-            for jj, d_inner_h_ref in enumerate(self._d_inner_h_ref_array):
-                d_inner_h_array = (
-                    d_inner_h_ref * self._ref_dist / self._distance_array)
-                if self.phase_marginalization:
-                    d_inner_h_array =\
-                        self._bessel_function_interped(abs(d_inner_h_array))
-                self._dist_margd_loglikelihood_array[ii][jj] = \
-                    logsumexp(d_inner_h_array - optimal_snr_squared_array / 2,
-                              b=self.distance_prior_array * self._delta_distance)
-        log_norm = logsumexp(0. / self._distance_array,
-                             b=self.distance_prior_array * self._delta_distance)
+        scaling = self._ref_dist / self._distance_array
+        d_inner_h_array_full = np.outer(self._d_inner_h_ref_array, scaling)
+        h_inner_h_array_full = np.outer(self._optimal_snr_squared_ref_array, scaling ** 2)
+        if self.phase_marginalization:
+            d_inner_h_array_full = ln_i0(abs(d_inner_h_array_full))
+        prior_term = self.distance_prior_array * self._delta_distance
+        for ii, optimal_snr_squared_array in tqdm(
+            enumerate(h_inner_h_array_full), total=len(self._optimal_snr_squared_ref_array)
+        ):
+            for jj, d_inner_h_array in enumerate(d_inner_h_array_full):
+                self._dist_margd_loglikelihood_array[ii][jj] = logsumexp(
+                    d_inner_h_array - optimal_snr_squared_array / 2,
+                    b=prior_term
+                )
+        log_norm = logsumexp(
+            0 / self._distance_array, b=self.distance_prior_array * self._delta_distance
+        )
         self._dist_margd_loglikelihood_array -= log_norm
         self.cache_lookup_table()
 
-    def _setup_phase_marginalization(self):
-        self._bessel_function_interped = interp1d(
-            np.logspace(-5, 10, int(1e6)), np.logspace(-5, 10, int(1e6)) +
-            np.log([i0e(snr) for snr in np.logspace(-5, 10, int(1e6))]),
-            bounds_error=False, fill_value=(0, np.nan))
+    def _setup_phase_marginalization(self, min_bound=-5, max_bound=10):
+        logger.warning(
+            "The _setup_phase_marginalization method is deprecated and will be removed, "
+            "please update the implementation of phase marginalization "
+            "to use bilby.gw.utils.ln_i0"
+        )
+
+    @staticmethod
+    def _bessel_function_interped(xx):
+        logger.warning(
+            "The _bessel_function_interped method is deprecated and will be removed, "
+            "please update the implementation of phase marginalization "
+            "to use bilby.gw.utils.ln_i0"
+        )
+        return ln_i0(xx) + xx
 
     def _setup_time_marginalization(self):
         self._delta_tc = 2 / self.waveform_generator.sampling_frequency
@@ -729,6 +961,61 @@ class GravitationalWaveTransient(Likelihood):
                     self.waveform_generator.sampling_frequency + 1))[1:]
         self.time_prior_array = \
             self.priors['geocent_time'].prob(self._times) * self._delta_tc
+
+    def _setup_calibration_marginalization(self, calibration_lookup_table):
+        if calibration_lookup_table is None:
+            calibration_lookup_table = {}
+        self.calibration_draws = {}
+        self.calibration_abs_draws = {}
+        self.calibration_parameter_draws = {}
+        for interferometer in self.interferometers:
+
+            # Force the priors
+            calibration_priors = PriorDict()
+            for key in self.priors.keys():
+                if 'recalib' in key and interferometer.name in key:
+                    calibration_priors[key] = copy.copy(self.priors[key])
+                    self.priors[key] = DeltaFunction(0.0)
+
+            # If there is no entry in the lookup table, make an empty one
+            if interferometer.name not in calibration_lookup_table.keys():
+                calibration_lookup_table[interferometer.name] =\
+                    f'{interferometer.name}_calibration_file.h5'
+
+            # If the interferometer lookup table file exists, generate the curves from it
+            if os.path.exists(calibration_lookup_table[interferometer.name]):
+                self.calibration_draws[interferometer.name] =\
+                    calibration.read_calibration_file(
+                        calibration_lookup_table[interferometer.name], self.interferometers.frequency_array,
+                        self.number_of_response_curves, self.starting_index)
+
+            else:  # generate the fake curves
+                from tqdm.auto import tqdm
+                self.calibration_parameter_draws[interferometer.name] =\
+                    pd.DataFrame(calibration_priors.sample(self.number_of_response_curves))
+
+                self.calibration_draws[interferometer.name] = \
+                    np.zeros((self.number_of_response_curves, len(interferometer.frequency_array)), dtype=complex)
+
+                for i in tqdm(range(self.number_of_response_curves)):
+                    self.calibration_draws[interferometer.name][i, :] =\
+                        interferometer.calibration_model.get_calibration_factor(
+                            interferometer.frequency_array,
+                            prefix='recalib_{}_'.format(interferometer.name),
+                            **self.calibration_parameter_draws[interferometer.name].iloc[i])
+
+                calibration.write_calibration_file(
+                    calibration_lookup_table[interferometer.name],
+                    self.interferometers.frequency_array,
+                    self.calibration_draws[interferometer.name],
+                    self.calibration_parameter_draws[interferometer.name])
+
+            interferometer.calibration_model = calibration.Recalibrate()
+
+            _mask = interferometer.frequency_mask
+            self.calibration_draws[interferometer.name] = self.calibration_draws[interferometer.name][:, _mask]
+            self.calibration_abs_draws[interferometer.name] =\
+                np.abs(self.calibration_draws[interferometer.name])**2
 
     @property
     def interferometers(self):
@@ -788,10 +1075,24 @@ class GravitationalWaveTransient(Likelihood):
     @property
     def lal_version(self):
         try:
-            from lal import git_version
-            lal_version = str(git_version.verbose_msg).replace("\n", ";")
-            logger.info("Using LAL version {}".format(lal_version))
-            return lal_version
+            from lal import git_version, __version__
+            lal_version = str(__version__)
+            logger.info("Using lal version {}".format(lal_version))
+            lal_git_version = str(git_version.verbose_msg).replace("\n", ";")
+            logger.info("Using lal git version {}".format(lal_git_version))
+            return "lal_version={}, lal_git_version={}".format(lal_version, lal_git_version)
+        except (ImportError, AttributeError):
+            return "N/A"
+
+    @property
+    def lalsimulation_version(self):
+        try:
+            from lalsimulation import git_version, __version__
+            lalsim_version = str(__version__)
+            logger.info("Using lalsimulation version {}".format(lalsim_version))
+            lalsim_git_version = str(git_version.verbose_msg).replace("\n", ";")
+            logger.info("Using lalsimulation git version {}".format(lalsim_git_version))
+            return "lalsimulation_version={}, lalsimulation_git_version={}".format(lalsim_version, lalsim_git_version)
         except (ImportError, AttributeError):
             return "N/A"
 
@@ -802,6 +1103,7 @@ class GravitationalWaveTransient(Likelihood):
             time_marginalization=self.time_marginalization,
             phase_marginalization=self.phase_marginalization,
             distance_marginalization=self.distance_marginalization,
+            calibration_marginalization=self.calibration_marginalization,
             waveform_generator_class=self.waveform_generator.__class__,
             waveform_arguments=self.waveform_generator.waveform_arguments,
             frequency_domain_source_model=self.waveform_generator.frequency_domain_source_model,
@@ -811,7 +1113,8 @@ class GravitationalWaveTransient(Likelihood):
             start_time=self.waveform_generator.start_time,
             time_reference=self.time_reference,
             reference_frame=self._reference_frame_str,
-            lal_version=self.lal_version)
+            lal_version=self.lal_version,
+            lalsimulation_version=self.lalsimulation_version)
 
 
 class BasicGravitationalWaveTransient(Likelihood):
@@ -827,7 +1130,7 @@ class BasicGravitationalWaveTransient(Likelihood):
 
 
         Parameters
-        ----------
+        ==========
         interferometers: list
             A list of `bilby.gw.detector.Interferometer` instances - contains the
             detector data and power spectral densities
@@ -848,7 +1151,7 @@ class BasicGravitationalWaveTransient(Likelihood):
         """ Calculates the real part of noise log-likelihood
 
         Returns
-        -------
+        =======
         float: The real part of the noise log likelihood
 
         """
@@ -863,7 +1166,7 @@ class BasicGravitationalWaveTransient(Likelihood):
         """ Calculates the real part of log-likelihood value
 
         Returns
-        -------
+        =======
         float: The real part of the log likelihood
 
         """
@@ -883,14 +1186,14 @@ class BasicGravitationalWaveTransient(Likelihood):
         """
 
         Parameters
-        ----------
+        ==========
         waveform_polarizations: dict
             Dictionary containing the desired waveform polarization modes and the related strain
         interferometer: bilby.gw.detector.Interferometer
             The Interferometer object we want to have the log-likelihood for
 
         Returns
-        -------
+        =======
         float: The real part of the log-likelihood for this interferometer
 
         """
@@ -912,7 +1215,7 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
     https://git.ligo.org/lscsoft/ROQ_data.
 
     Parameters
-    ----------
+    ==========
     interferometers: list, bilby.gw.detector.InterferometerList
         A list of `bilby.detector.Interferometer` instances - contains the
         detector data and power spectral densities
@@ -934,6 +1237,8 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
         The ROQ scale factor used.
     priors: dict, bilby.prior.PriorDict
         A dictionary of priors containing at least the geocent_time prior
+        Warning: when using marginalisation the dict is overwritten which will change the
+        the dict you are passing in. If this behaviour is undesired, pass `priors.copy()`.
     distance_marginalization_lookup_table: (dict, str), optional
         If a dict, dictionary containing the lookup_table, distance_array,
         (distance) prior_array, and reference_distance used to construct
@@ -1012,7 +1317,7 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
         Compute the snrs for ROQ
 
         Parameters
-        ----------
+        ==========
         waveform_polarizations: waveform
         interferometer: bilby.gw.detector.Interferometer
 
@@ -1052,27 +1357,31 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
             return self._CalculatedSNRs(
                 d_inner_h=np.nan_to_num(-np.inf), optimal_snr_squared=0,
                 complex_matched_filter_snr=np.nan_to_num(-np.inf),
-                d_inner_h_squared_tc_array=None)
+                d_inner_h_squared_tc_array=None,
+                d_inner_h_array=None,
+                optimal_snr_squared_array=None)
 
         d_inner_h_tc_array = np.einsum(
             'i,ji->j', np.conjugate(h_plus_linear + h_cross_linear),
             self.weights[interferometer.name + '_linear'][indices])
 
-        d_inner_h = interp1d(
-            self.weights['time_samples'][indices],
-            d_inner_h_tc_array, kind='cubic', assume_sorted=True)(ifo_time)
+        d_inner_h = self._interp_five_samples(
+            self.weights['time_samples'][indices], d_inner_h_tc_array, ifo_time)
 
         optimal_snr_squared = \
             np.vdot(np.abs(h_plus_quadratic + h_cross_quadratic)**2,
                     self.weights[interferometer.name + '_quadratic'])
 
-        complex_matched_filter_snr = d_inner_h / (optimal_snr_squared**0.5)
+        with np.errstate(invalid="ignore"):
+            complex_matched_filter_snr = d_inner_h / (optimal_snr_squared**0.5)
         d_inner_h_squared_tc_array = None
 
         return self._CalculatedSNRs(
             d_inner_h=d_inner_h, optimal_snr_squared=optimal_snr_squared,
             complex_matched_filter_snr=complex_matched_filter_snr,
-            d_inner_h_squared_tc_array=d_inner_h_squared_tc_array)
+            d_inner_h_squared_tc_array=d_inner_h_squared_tc_array,
+            d_inner_h_array=None,
+            optimal_snr_squared_array=None)
 
     @staticmethod
     def _closest_time_indices(time, samples):
@@ -1080,29 +1389,57 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
         Get the closest five times
 
         Parameters
-        ----------
+        ==========
         time: float
             Time to check
         samples: array-like
             Available times
 
         Returns
-        -------
+        =======
         indices: list
             Indices nearest to time
         in_bounds: bool
             Whether the indices are for valid times
         """
-        closest = np.argmin(abs(samples - time))
+        closest = int((time - samples[0]) / (samples[1] - samples[0]))
         indices = [closest + ii for ii in [-2, -1, 0, 1, 2]]
         in_bounds = (indices[0] >= 0) & (indices[-1] < samples.size)
         return indices, in_bounds
+
+    @staticmethod
+    def _interp_five_samples(time_samples, values, time):
+        """
+        Interpolate a function of time with its values at the closest five times.
+        The algorithm is explained in https://dcc.ligo.org/T2100224.
+
+        Parameters
+        ==========
+        time_samples: array-like
+            Closest 5 times
+        values: array-like
+            The values of the function at closest 5 times
+        time: float
+            Time at which the function is calculated
+
+        Returns
+        =======
+        value: float
+            The value of the function at the input time
+        """
+        r1 = (-values[0] + 8. * values[1] - 14. * values[2] + 8. * values[3] - values[4]) / 4.
+        r2 = values[2] - 2. * values[3] + values[4]
+        a = (time_samples[3] - time) / (time_samples[1] - time_samples[0])
+        b = 1. - a
+        c = (a**3. - a) / 6.
+        d = (b**3. - b) / 6.
+        return a * values[2] + b * values[3] + c * r1 + d * r2
 
     def perform_roq_params_check(self, ifo=None):
         """ Perform checking that the prior and data are valid for the ROQ
 
         Parameters
-        ----------
+        ==========
         ifo: bilby.gw.detector.Interferometer
             The interferometer
         """
@@ -1168,25 +1505,38 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
                         roq_minimum_component_mass))
 
     def _set_weights(self, linear_matrix, quadratic_matrix):
-        """ Setup the time-dependent ROQ weights.
+        """
+        Setup the time-dependent ROQ weights.
+        See https://dcc.ligo.org/LIGO-T2100125 for the detail of how to compute them.
 
         Parameters
-        ----------
+        ==========
         linear_matrix, quadratic_matrix: array_like
             Arrays of the linear and quadratic basis
 
         """
 
         time_space = self._get_time_resolution()
+        number_of_time_samples = int(self.interferometers.duration / time_space)
+        try:
+            import pyfftw
+            ifft_input = pyfftw.empty_aligned(number_of_time_samples, dtype=complex)
+            ifft_output = pyfftw.empty_aligned(number_of_time_samples, dtype=complex)
+            ifft = pyfftw.FFTW(ifft_input, ifft_output, direction='FFTW_BACKWARD')
+        except ImportError:
+            pyfftw = None
+            logger.warning("You do not have pyfftw installed, falling back to numpy.fft.")
+            ifft_input = np.zeros(number_of_time_samples, dtype=complex)
+            ifft = np.fft.ifft
         # Maximum delay time to geocentre + 5 steps
         earth_light_crossing_time = radius_of_earth / speed_of_light + 5 * time_space
-        delta_times = np.arange(
-            self.priors['{}_time'.format(self.time_reference)].minimum - earth_light_crossing_time,
-            self.priors['{}_time'.format(self.time_reference)].maximum + earth_light_crossing_time,
-            time_space)
-        time_samples = delta_times - self.interferometers.start_time
-        self.weights['time_samples'] = time_samples
-        logger.info("Using {} ROQ time samples".format(len(time_samples)))
+        start_idx = max(0, int(np.floor((self.priors['{}_time'.format(self.time_reference)].minimum -
+                        earth_light_crossing_time - self.interferometers.start_time) / time_space)))
+        end_idx = min(number_of_time_samples - 1, int(np.ceil((
+                      self.priors['{}_time'.format(self.time_reference)].maximum + earth_light_crossing_time -
+                      self.interferometers.start_time) / time_space)))
+        self.weights['time_samples'] = np.arange(start_idx, end_idx + 1) * time_space
+        logger.info("Using {} ROQ time samples".format(len(self.weights['time_samples'])))
 
         for ifo in self.interferometers:
             if self.roq_params is not None:
@@ -1207,8 +1557,8 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
             else:
                 overlap_frequencies = ifo.frequency_array[ifo.frequency_mask]
                 roq_idxs = np.arange(linear_matrix.shape[0], dtype=int)
-                ifo_idxs = [True] * sum(ifo.frequency_mask)
-                if sum(ifo_idxs) != len(roq_idxs):
+                ifo_idxs = np.arange(sum(ifo.frequency_mask))
+                if len(ifo_idxs) != len(roq_idxs):
                     raise ValueError(
                         "Mismatch between ROQ basis and frequency array for "
                         "{}".format(ifo.name))
@@ -1218,34 +1568,16 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
                     ifo.name, len(overlap_frequencies),
                     min(overlap_frequencies), max(overlap_frequencies)))
 
-            logger.debug("Preallocate array")
-            tc_shifted_data = np.zeros((
-                len(self.weights['time_samples']), len(overlap_frequencies)),
-                dtype=complex)
-
-            logger.debug("Calculate shifted data")
-            data = ifo.frequency_domain_strain[ifo.frequency_mask][ifo_idxs]
-            prefactor = (
-                data /
+            ifft_input[:] *= 0.
+            self.weights[ifo.name + '_linear'] = \
+                np.zeros((len(self.weights['time_samples']), linear_matrix.shape[1]), dtype=complex)
+            data_over_psd = ifo.frequency_domain_strain[ifo.frequency_mask][ifo_idxs] / \
                 ifo.power_spectral_density_array[ifo.frequency_mask][ifo_idxs]
-            )
-            for j in range(len(self.weights['time_samples'])):
-                tc_shifted_data[j] = prefactor * np.exp(
-                    2j * np.pi * overlap_frequencies * time_samples[j])
-
-            # to not kill all computers this minimises the memory usage of the
-            # required inner products
-            max_block_gigabytes = 4
-            max_elements = int((max_block_gigabytes * 2 ** 30) / 8)
-
-            logger.debug("Apply dot product")
-            self.weights[ifo.name + '_linear'] = blockwise_dot_product(
-                tc_shifted_data,
-                linear_matrix[roq_idxs],
-                max_elements) * 4 / ifo.strain_data.duration
-
-            del tc_shifted_data, overlap_frequencies
-            gc.collect()
+            nonzero_idxs = ifo_idxs + int(ifo.frequency_array[ifo.frequency_mask][0] * self.interferometers.duration)
+            for i, basis_element in enumerate(linear_matrix[roq_idxs].T):
+                ifft_input[nonzero_idxs] = data_over_psd * np.conj(basis_element)
+                self.weights[ifo.name + '_linear'][:, i] = ifft(ifft_input)[start_idx:end_idx + 1]
+            self.weights[ifo.name + '_linear'] *= 4. * number_of_time_samples / self.interferometers.duration
 
             self.weights[ifo.name + '_quadratic'] = build_roq_weights(
                 1 /
@@ -1254,6 +1586,9 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
                 1 / ifo.strain_data.duration)
 
             logger.info("Finished building weights for {}".format(ifo.name))
+
+        if pyfftw is not None:
+            pyfftw.forget_wisdom()
 
     def save_weights(self, filename, format='npz'):
         if format not in filename:
@@ -1270,7 +1605,7 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
         if format is None:
             format = filename.split(".")[-1]
         if format not in ["json", "npz"]:
-            raise IOError("Format {} not recongized.".format(format))
+            raise IOError("Format {} not recognized.".format(format))
         logger.info("Loading ROQ weights from {}".format(filename))
         if format == "json":
             with open(filename, 'r') as file:
@@ -1291,7 +1626,7 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
         each detector.
 
         Returns
-        -------
+        =======
         delta_t: float
             Time resolution
         """
@@ -1300,7 +1635,7 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
             """
 
             Parameters
-            ----------
+            ==========
             freq: array-like
                 Frequency array
             psd: array-like
@@ -1309,14 +1644,15 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
                 SNR dependent scaling factor
 
             Returns
-            -------
+            =======
             f_high: float
                 The maximum frequency which must be considered
             """
+            from scipy.integrate import simps
             integrand1 = np.power(freq, -7. / 3) / psd
-            integral1 = integrate.simps(integrand1, freq)
+            integral1 = simps(integrand1, freq)
             integrand3 = np.power(freq, 2. / 3.) / (psd * integral1)
-            f_3_bar = integrate.simps(integrand3, freq)
+            f_3_bar = simps(integrand3, freq)
 
             f_high = scaling * f_3_bar**(1 / 3)
 
@@ -1327,7 +1663,7 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
 
         inj_snr_sq = 0
         for ifo in self.interferometers:
-            inj_snr_sq += min(10, getattr(ifo.meta_data, 'optimal_SNR', 30))**2
+            inj_snr_sq += max(10, ifo.meta_data.get('optimal_SNR', 30))**2
 
         psd = ifo.power_spectral_density_array[ifo.frequency_mask]
         freq = ifo.frequency_array[ifo.frequency_mask]
@@ -1338,6 +1674,12 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
         # Apply a safety factor to ensure the time step is short enough
         delta_t = delta_t / 5
 
+        # duration / delta_t needs to be a power of 2 for IFFT
+        number_of_time_samples = max(
+            self.interferometers.duration / delta_t,
+            self.interferometers.frequency_array[-1] * self.interferometers.duration + 1)
+        number_of_time_samples = int(2**np.ceil(np.log2(number_of_time_samples)))
+        delta_t = self.interferometers.duration / number_of_time_samples
         logger.info("ROQ time-step = {}".format(delta_t))
         return delta_t
 
@@ -1348,17 +1690,17 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
 
 
 def get_binary_black_hole_likelihood(interferometers):
-    """ A rapper to quickly set up a likelihood for BBH parameter estimation
+    """ A wrapper to quickly set up a likelihood for BBH parameter estimation
 
     Parameters
-    ----------
+    ==========
     interferometers: {bilby.gw.detector.InterferometerList, list}
         A list of `bilby.detector.Interferometer` instances, typically the
         output of either `bilby.detector.get_interferometer_with_open_data`
         or `bilby.detector.get_interferometer_with_fake_noise_and_injection`
 
     Returns
-    -------
+    =======
     bilby.GravitationalWaveTransient: The likelihood to pass to `run_sampler`
 
     """

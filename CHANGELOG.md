@@ -1,5 +1,185 @@
 # All notable changes will be documented in this file
 
+## [1.1.3] 2021-07-02
+Version 1.1.3 release of bilby
+
+### Added
+- Added `Categorical` prior (!982)(!990)
+- Added a built-in mcmc sampler (`bilby_mcmc`) (!905)(!985)
+- Added run statistics to the `dynesty` meta data (!969)
+- Added `cdf` method to `PriorDict` classes (!943)
+
+### Changes
+- Removed the autoburnin causing `kombine` to fail the CI tests (!988)
+- Sped up the spline interpolation in ROQ (!971)
+- Replaced bessel interpolant to scipy function (!976)
+- Improved checkpoint stats plot (!977)
+- Fixed a typo in the sampler documentation (!986)
+- Fixed issue that causes ConditionalDeltaFunction posterior samples not to be saved correctly (!973)
+- Solved an issue where injected SNRs were logged incorrectly (!980)
+- Made Python 3.6+ a specific requirement (!978)
+- Fixed the calibration and time marginalized likelihood (!978)
+- Removed a possible error in the distance marginalization (!960)
+- Fixed an issue where `check_draw` did not catch `np.nan` values (!965)
+- Removed a superfluous line in the docs configuration file (!963)
+- Added a warning about class side effects to the `GravtiationalWaveTransient` likelihood classes (!964)
+- Allow `ptemcee` initialization with array (!955)
+- Removed `Prior.test_valid_for_rescaling` (!956)
+- Replaced deprecated numpy aliases builtins (!970)
+- Fixed a bug in the algorithm to determine time resolution of ROQ (!967)
+- Restructured utils module into several submodules. API remains backwards compatible (!873)
+- Changed number of default walks in `dynesty` from `10*self.ndim` to `100` (!961)
+
+## [1.1.2] 2021-05-05
+Version 1.1.2 release of bilby
+
+### Added
+- Added MCMC combine method and improved shuffle behaviour when combining results (!945)
+- Added an extras requires to enable downstream packages to depend on `bilby.gw` (!939)
+- Added a dynesty unit plot (!954)
+
+### Changes
+- Removed a number of deprecated functions and classes (!936)
+- Removed the pin on the numpy version (!934)
+- Added requirements to MANIFEST (!929)
+- Sped up the ROQ weight calculation with IFFT (!903)
+- Streamlined hdf5 improvements (!925)
+- Sped up `import bilby` by reducing internal imports (!933)
+- Reduced time required for the sampler tests (!949)
+- Resolved an unclear error message (!935)
+- Encapsulated GMST method in `gw.utils` (!947)
+- Improvements to `gw.utils` (!948)
+- Improvements to `core.prior` (!944)
+- Suppresses error message when creating injections (!938)
+- Fixed loading meta data, booleans, string lists with hdf5 (!941)
+- Made tables an optional requirement (!930)
+- Added `exists_ok` to `mkdir` calls (!946)
+- Increased the default dynesty checkpoint time to 30 minutes (!940)
+- Resolved issue with sampling from prior test (!950)
+- Added errstate ignore to the gw.conversion module (!952)
+- Fixed issues with pickle saving and loading (!932)
+- Fixed an issue with the `_base_roq_waveform` (!959)
+
+## [1.1.1] 2021-03-16
+Version 1.1.1 release of bilby
+
+### Changes
+- Added `include requirements.txt` in `MANIFEST.in` to stop the pip installation from breaking
+
+## [1.1.0] 2021-03-15
+Version 1.1.0 release of bilby
+
+### Added
+- Calibration marginalisation using a discrete set of realisations (!856)
+- Nessai sampler (!921, !926)
+- Capability to sample in aligned spin and spin magnitude (!868)
+- Information gain now stored in the result (!907)
+- Added option to save result/interferometers as pickle (!925)
+- Added functionality to notch data (!898)
+- Added LIGO India Aundha (A1) coordinates (!886)
+
+### Changes
+- Fixed periodic keys not working when constrained priors are present in pymultinest (!927)
+- Some changes to reweighting likelihoods (!851)
+- `CBCPriorDict` is now a `ConditionalPriorDict` (!868)
+- Fixed hyper PE example (!910)
+- Pinned numpy and pandas version number (!916)
+- Fixed an issue with GPS times in `cpnest`
+- `deepdish` is now longer a requirement since it lost its support (!925)
+- Removed annoying warning message due to use of `newcommand` in latex (!924)
+- Interpolation should be slightly faster now because we now access interpolation libraries more directly (!917, !923)
+- Documentation now builds properly (!915)
+- Fixed a bug caused by `loaded_modules_dict` (!920)
+- `_ref_dist` is an attribute now which speeds up distance marginalised runs slightly (!913)
+- Cache normalisation for `PriorDict` objects without `Constraint` priors (!914)
+- Removed some deprecated `__future__` imports (!911)
+- Fixed the behaviour of `plot_waveform_posterior` to use representative samples (!894)
+- Uses `tqdm.auto` in some samplers now for better progress bars (!895)
+- Fixed the correction of the epoch in time domain waveforms when using a segment duration that is not a power of two (!909)
+- Fixed `ultranest` from failing
+- Fixed issues with plotting failing in tests (!904)
+- Changed the CI to run on auto-built images (!899)
+- Resolved a `matplotlib` error occurring at `dynesty` checkpoint plots (!902)
+- Fixed the multidimensional Gaussian example (!901)
+- Now allow any lal dictionary option and added a numerical relativity file (!896)
+- Fixed the likelihood count in `dynesty` (!853)
+- Changed the ordering of keyword arguments for the `Sine` and `Cosine` constructors (!892)
+
+## [1.0.4] 2020-11-23
+Version 1.0.4 release of bilby
+
+### Added
+- Added a chirp-mass and mass-ratio prior which are uniform in component masses (!891)
+
+### Changes
+- Fixed issue in the CI
+
+## [1.0.3] 2020-10-23
+
+Version 1.0.3 release of bilby
+
+### Added
+- SlabSpikePrior and examples (!857)
+- Authors file (!885)
+- CDF function to conditional priors (!882)
+- Waveform plot in visualising_the_results.ipynb (!817)
+- Addition of dnest4 sampler (!849, !883)
+- Loaded modules added to meta-data (!881)
+
+### Changes
+- Constraint to Uniform priors in ROQ tutorial (!884)
+- Fix to CDF and PDF for SymmetricLogUniform prior (!876)
+- Fix bug in evidence combination (!880)
+- Typo fixes (!878, !887, !879)
+- Minor bug fixes (!888)
+
+## [1.0.2] 2020-09-14
+
+Version 1.0.2 release of bilby
+
+### Added
+- Template for the docker files (!783)
+- New delta_phase parameter (!850)
+- Normalization factor to time-domain waveform plot (!867)
+- JSON encoding for int and float types (!866)
+- Various minor formatting additions (!870)
+
+### Changes
+- Switched to the conda-forge version of multinest and ultranest (!783)
+- Updates KAGRA - K1 interferometer information (!861)
+- Restructures to tests to be uniform across project (!834)
+- Fix to distance and phase marginalization method (!875)
+- Fixed roundoff of in-plane spins samples with vectorisation (!864)
+- Fix to reference distance and interpolant behavior (!858)
+- Fix to constraint prior sampling method (!863)
+- Clean up of code (!854)
+- Various minor bug, test and plotting fixes (!859, !874, !872, !865)
+
+## [1.0.1] 2020-08-29
+
+Version 1.0.1 release of bilby
+
+### Added
+- Added an rcparams configuration for plotting (!832)
+- Added `chi_1` and `chi_2` parameters to default latex label dictionary (!841)
+- Allow output merged result file to be gzip or saved as a HDF5 file (!802)
+
+### Changes
+- Fixed first value in EOS cumulative integral(!860)
+- Fixed saving the number of likelihood evaluations (!848)
+- Likelihood condition is now strictly increasing (!846)
+- Fixed a minor issue with conditional priors that could cause unexpected behaviour in edge cases (!838)
+- Fixed `__repr__` method in the `FromFile` prior (!836)
+- Fixed an issue that caused problems for some users when plotting with a latex backend (!816)
+- Fixed bug that occurred when min/max of interpolated priors was changed (!815)
+- Fixed time domain waveform epoch (!736)
+- Fixed time keeping in multinest (!830)
+- Now checks if marginalised priors were defined before marginalising (!829)
+- Fixed an issue with multivariate Gaussian prior (!822)
+- Various minor code improvements (!836)(!839)
+- Various minor bug fixes and improvements to the documentation (!820)(!823)(!837)
+- Various testing improvements (!833)(!847)(!855)(!852)
+
 ## [1.0.0] 2020-07-06
 
 Version 1.0 release of bilby
@@ -29,7 +209,7 @@ for details
 - Updated the default PSD to O4 (!757)
 - Make multinest allow long file names, optional and work with MPI (!764 !785)
 - Add min/max to aligned spin prior (!787)
-- Reduce redudant code (!703)
+- Reduce redundant code (!703)
 - Added testing for python 3.8 (!762)
 - Improvements to the waveform plot (!769)
 
@@ -130,7 +310,7 @@ parameters.
 
 ## Changes
 - Speed up the prior evaluations by implementing directly with checks to scipy !627
-- Soft initalisation option for the Sampler class !620
+- Soft initialisation option for the Sampler class !620
 - Improvements to JSON reading and writing for functions !621
 - Fixed bug in prior reading !618 !617
 - Fixes to the examples !619 !614 !626 !616
@@ -191,7 +371,7 @@ parameters.
 - Removed the sqrt(2) normalisation from the scalar longitudinal mode
 - Improve PSD filename reading (no longer required "/" to read local files)
 - Fix bug in emcee chains
-- Added a try/except cluase for building the lookup table
+- Added a try/except clause for building the lookup table
 
 ## [0.5.4] 2019-07-30
 
@@ -232,7 +412,7 @@ shown (!564) to provide better convergence for the long-duration high-spin tests
 
 ### Changed
 - Updated and fixed bugs in examples
-- Resolve sampling time persistence for runs which are interupted
+- Resolve sampling time persistence for runs which are interrupted
 - Improvements to the PP plot
 - Speed up of the distance calculation
 - Fixed a bug in the inteference of bilby command line arguments with user specified command lines
@@ -528,7 +708,7 @@ re-instantiate the Prior in most cases
 - Changed to using `setuptools` for installation.
 - Clean up of real data handling: all data is now windowed with a 0.4s roll off (unless set otherwise) and low-pass filtered.
 - Add explicit method to create a power spectral density from time-domain data
-- Clean up of `PowerSpectralDensity()` - addds `set_from` methods to handle various ways to define the PSD.
+- Clean up of `PowerSpectralDensity()` - adds `set_from` methods to handle various ways to define the PSD.
 - Clean up of `detectors.py`: adds an `InterferometerStrainData` to handle strain data and `InterferometerSet` to handle multiple interferometers. All data setting should primarily be done through the `Interferometer.set_strain_data..` methods.
 - Fix the comments and units of `nfft` and `infft` and general improvement to documentation of data.
 - Fixed a bug in create_time_series
