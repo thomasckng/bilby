@@ -43,6 +43,14 @@ basic-3.7:
   <<: *test-python
   image: python:3.7
 
+basic-3.8:
+  <<: *test-python
+  image: python:3.8
+
+basic-3.9:
+  <<: *test-python
+  image: python:3.9
+
 # test example on python 3.7
 python-3.7:
   stage: test
@@ -89,7 +97,16 @@ docs:
 # test example on python 3.8
 python-3.8:
   stage: test
-  needs: ["basic-3.7", "precommits-py3.7"]
+  needs: ["basic-3.8", "precommits-py3.7"]
+  image: quay.io/bilbydev/v2-dockerfile-test-suite-python38
+  script:
+    - python -m pip install .
+
+    - pytest
+
+python-3.9:
+  stage: test
+  needs: ["basic-3.9", "precommits-py3.7"]
   image: quay.io/bilbydev/v2-dockerfile-test-suite-python38
   script:
     - python -m pip install .
@@ -109,7 +126,7 @@ python-3.7-samplers:
 # test samplers on python 3.8
 python-3.8-samplers:
   stage: test
-  needs: ["basic-3.7", "precommits-py3.7"]
+  needs: ["basic-3.8", "precommits-py3.7"]
   image: quay.io/bilbydev/v2-dockerfile-test-suite-python38
   script:
     - python -m pip install .
