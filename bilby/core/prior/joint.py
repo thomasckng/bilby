@@ -11,7 +11,7 @@ class BaseJointPriorDist(object):
     def __init__(self, names, bounds=None):
         """
         A class defining JointPriorDist that will be overwritten with child
-        classes defining the joint prior distribtuions between given parameters,
+        classes defining the joint prior distributions between given parameters,
 
 
         Parameters
@@ -172,7 +172,7 @@ class BaseJointPriorDist(object):
             raise ValueError("Array is the wrong shape")
 
         # check sample(s) is within bounds
-        outbounds = np.ones(samp.shape[0], dtype=np.bool)
+        outbounds = np.ones(samp.shape[0], dtype=bool)
         for s, bound in zip(samp.T, self.bounds.values()):
             outbounds = (s < bound[0]) | (s > bound[1])
             if np.any(outbounds):
@@ -210,7 +210,7 @@ class BaseJointPriorDist(object):
         samp: vector
             sample to evaluate the ln_prob at
         lnprob: vector
-            of -inf pased in with the same shape as the number of samples
+            of -inf passed in with the same shape as the number of samples
         outbounds: array_like
             boolean array showing which samples in lnprob vector are out of the given bounds
 
@@ -231,7 +231,7 @@ class BaseJointPriorDist(object):
         Parameters
         ==========
         size: int
-            number of samples to generate, defualts to 1
+            number of samples to generate, defaults to 1
         """
 
         if size is None:
@@ -250,7 +250,7 @@ class BaseJointPriorDist(object):
         Parameters
         ==========
         size: int
-            number of samples to generate, defualts to 1
+            number of samples to generate, defaults to 1
         """
         samps = np.zeros((size, len(self)))
         """
@@ -299,7 +299,7 @@ class BaseJointPriorDist(object):
         Parameters
         ==========
         samp: numpy array
-            this is a vector sample drawn from a uniform distribtuion to be rescaled to the distribution
+            this is a vector sample drawn from a uniform distribution to be rescaled to the distribution
         """
         """
         Here is where the subclass where overwrite rescale method
@@ -630,7 +630,7 @@ class MultivariateGaussianDist(BaseJointPriorDist):
             elif isinstance(self.__dict__[key], (np.ndarray, list)):
                 thisarr = np.asarray(self.__dict__[key])
                 otherarr = np.asarray(other.__dict__[key])
-                if thisarr.dtype == np.float and otherarr.dtype == np.float:
+                if thisarr.dtype == float and otherarr.dtype == float:
                     fin1 = np.isfinite(np.asarray(self.__dict__[key]))
                     fin2 = np.isfinite(np.asarray(other.__dict__[key]))
                     if not np.array_equal(fin1, fin2):
@@ -707,10 +707,9 @@ class JointPrior(Prior):
         Returns
         =======
         float:
-            A sample from the prior paramter.
+            A sample from the prior parameter.
         """
 
-        self.test_valid_for_rescaling(val)
         self.dist.rescale_parameters[self.name] = val
 
         if self.dist.filled_rescale():
@@ -734,7 +733,7 @@ class JointPrior(Prior):
         Returns
         =======
         float:
-            A sample from the prior paramter.
+            A sample from the prior parameter.
         """
 
         if self.name in self.dist.sampled_parameters:

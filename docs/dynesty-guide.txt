@@ -64,7 +64,7 @@ arguments
 
 3. :code:`adapt_tscale`: the number of live point updates over which the running mean estimate of the auto-correlation time averages.  Default is 100, which is a good compromise between stability of the estimate and adapting to the changing constrained prior as the sampling progresses.
 
-In general, poor convergance can be resolved by increasing :code:`nact`. For GW
+In general, poor convergence can be resolved by increasing :code:`nact`. For GW
 events, we find a value of 1 to few is typically okay.  You can revert to the
 original dynesty implementation by specifying :code:`sample="rwalk_dynesty"`.
 

@@ -152,7 +152,7 @@ def lal_binary_neutron_star(
           only take positive modes and return the positive and the negative
           mode together, while others need to call both.  e.g.
           waveform_arguments = dict(waveform_approximant='IMRPhenomHM',
-          mode_array=[[2,2],[4,-4]]) returns the 22 a\nd 2-2 of IMRPhenomHM.
+          mode_array=[[2,2],[4,-4]]) returns the 22 and 2-2 of IMRPhenomHM.
           However, waveform_arguments =
           dict(waveform_approximant='IMRPhenomXHM', mode_array=[[2,2],[4,-4]])
           returns the 22 and 4-4 of IMRPhenomXHM.
@@ -387,8 +387,8 @@ def _base_lal_cbc_fd_waveform(
             else:
                 raise
 
-    h_plus = np.zeros_like(frequency_array, dtype=np.complex)
-    h_cross = np.zeros_like(frequency_array, dtype=np.complex)
+    h_plus = np.zeros_like(frequency_array, dtype=complex)
+    h_cross = np.zeros_like(frequency_array, dtype=complex)
 
     if len(hplus.data.data) > len(frequency_array):
         logger.debug("LALsim waveform longer than bilby's `frequency_array`" +
@@ -518,6 +518,12 @@ def _base_roq_waveform(
         phase, mass_1, mass_2, spin_1x, spin_1y, spin_1z, spin_2x, spin_2y,
         spin_2z, reference_frequency, luminosity_distance, iota,
         waveform_dictionary, approximant, frequency_nodes_linear)
+
+    waveform_dictionary = CreateDict()
+    lalsim_SimInspiralWaveformParamsInsertTidalLambda1(
+        waveform_dictionary, lambda_1)
+    lalsim_SimInspiralWaveformParamsInsertTidalLambda2(
+        waveform_dictionary, lambda_2)
 
     h_quadratic_plus, h_quadratic_cross = lalsim_SimInspiralChooseFDWaveformSequence(
         phase, mass_1, mass_2, spin_1x, spin_1y, spin_1z, spin_2x, spin_2y,

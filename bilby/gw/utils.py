@@ -4,6 +4,7 @@ from math import fmod
 
 import numpy as np
 from scipy.interpolate import interp1d
+from scipy.special import i0e
 
 from ..core.utils import (ra_dec_to_theta_phi,
                           speed_of_light, logger, run_commandline,
@@ -453,7 +454,7 @@ def get_open_strain_data(
     cache: bool
         If true, cache the data
     buffer_time: float
-        Time to add to the begining and end of the segment.
+        Time to add to the beginning and end of the segment.
     **kwargs:
         Passed to `gwpy.timeseries.TimeSeries.fetch_open_data`
 
@@ -461,7 +462,7 @@ def get_open_strain_data(
     =======
     strain: gwpy.timeseries.TimeSeries
         The object containing the strain data. If the connection to the open-data server
-        fails, this function retruns `None`.
+        fails, this function returns `None`.
 
     """
     from gwpy.timeseries import TimeSeries
@@ -913,7 +914,7 @@ def spline_angle_xform(delta_psi):
 
     Parameters
     ==========
-    delta_psi: calibration phase uncertainity
+    delta_psi: calibration phase uncertainty
 
     Returns
     =======
@@ -983,39 +984,25 @@ def plot_spline_pos(log_freqs, samples, nfreqs=100, level=0.9, color='k', label=
     plt.xlim(freq_points.min() - .5, freq_points.max() + 50)
 
 
-class PropertyAccessor(object):
-    """
-    Generic descriptor class that allows handy access of properties without long
-    boilerplate code. The properties of Interferometer are defined as instances
-    of this class.
-
-    This avoids lengthy code like
-
-    .. code-block:: python
-
-        @property
-        def length(self):
-            return self.geometry.length
-
-        @length_setter
-        def length(self, length)
-            self.geometry.length = length
-
-    in the Interferometer class
-    """
-
-    def __init__(self, container_instance_name, property_name):
-        self.property_name = property_name
-        self.container_instance_name = container_instance_name
-
-    def __get__(self, instance, owner):
-        return getattr(getattr(instance, self.container_instance_name), self.property_name)
-
-    def __set__(self, instance, value):
-        setattr(getattr(instance, self.container_instance_name), self.property_name, value)
-
-
 def greenwich_mean_sidereal_time(time):
     from lal import GreenwichMeanSiderealTime
     time = float(time)
     return GreenwichMeanSiderealTime(time)
+
+
+def ln_i0(value):
+    """
+    A numerically stable method to evaluate ln(I_0) a modified Bessel function
+    of order 0 used in the phase-marginalized likelihood.
+
+    Parameters
+    ==========
+    value: array-like
+        Value(s) at which to evaluate the function
+
+    Returns
+    =======
+    array-like:
+        The natural logarithm of the bessel function
+    """
+    return np.log(i0e(value)) + value

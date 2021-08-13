@@ -3,9 +3,11 @@ emcee
 corner
 numpy
 matplotlib>=2.1
-scipy>=0.16
+scipy>=1.5
 pandas
 mock
 dill
 tqdm
 h5py
+tables
+astropy<4.3

@@ -254,16 +254,18 @@ def convert_to_lal_binary_black_hole_parameters(parameters):
     for angle in ['tilt_1', 'tilt_2', 'theta_jn']:
         cos_angle = str('cos_' + angle)
         if cos_angle in converted_parameters.keys():
-            converted_parameters[angle] =\
-                np.arccos(converted_parameters[cos_angle])
+            with np.errstate(invalid="ignore"):
+                converted_parameters[angle] =\
+                    np.arccos(converted_parameters[cos_angle])
 
     if "delta_phase" in original_keys:
-        converted_parameters["phase"] = np.mod(
-            converted_parameters["delta_phase"]
-            - np.sign(np.cos(converted_parameters["theta_jn"]))
-            * converted_parameters["psi"],
-            2 * np.pi
-        )
+        with np.errstate(invalid="ignore"):
+            converted_parameters["phase"] = np.mod(
+                converted_parameters["delta_phase"]
+                - np.sign(np.cos(converted_parameters["theta_jn"]))
+                * converted_parameters["psi"],
+                2 * np.pi
+            )
 
     added_keys = [key for key in converted_parameters.keys()
                   if key not in original_keys]
@@ -472,7 +474,7 @@ def chirp_mass_and_primary_mass_to_mass_ratio(chirp_mass, mass_1):
 
         (chirp_mass/mass_1)^5 = q^3 / (1 + q)
 
-    Solving for q, we find the releation expressed in python below for q.
+    Solving for q, we find the relation expressed in python below for q.
 
     Parameters
     ==========
@@ -512,7 +514,8 @@ def chirp_mass_and_mass_ratio_to_total_mass(chirp_mass, mass_ratio):
         Mass of the lighter object
     """
 
-    return chirp_mass * (1 + mass_ratio) ** 1.2 / mass_ratio ** 0.6
+    with np.errstate(invalid="ignore"):
+        return chirp_mass * (1 + mass_ratio) ** 1.2 / mass_ratio ** 0.6
 
 
 def component_masses_to_chirp_mass(mass_1, mass_2):
@@ -779,7 +782,6 @@ def _generate_all_cbc_parameters(sample, defaults, base_conversion,
             logger.debug('Assuming {} = {}'.format(key, default))
 
     output_sample = fill_from_fixed_priors(output_sample, priors)
-    output_sample, _ = base_conversion(output_sample)
     if likelihood is not None:
         if (
                 hasattr(likelihood, 'phase_marginalization') or
@@ -816,6 +818,9 @@ def _generate_all_cbc_parameters(sample, defaults, base_conversion,
                     "Failed to generate sky frame parameters for type {}"
                     .format(type(output_sample))
                 )
+    if likelihood is not None:
+        compute_snrs(output_sample, likelihood)
+    output_sample, _ = base_conversion(output_sample)
     for key, func in zip(["mass", "spin", "source frame"], [
             generate_mass_parameters, generate_spin_parameters,
             generate_source_frame_parameters]):
@@ -825,8 +830,6 @@ def _generate_all_cbc_parameters(sample, defaults, base_conversion,
             logger.info(
                 "Generation of {} parameters failed with message {}".format(
                     key, e))
-    if likelihood is not None:
-        compute_snrs(output_sample, likelihood)
     return output_sample
 
 
@@ -1151,7 +1154,6 @@ def compute_snrs(sample, likelihood):
             matched_filter_snrs = {
                 ifo.name: [] for ifo in likelihood.interferometers}
             optimal_snrs = {ifo.name: [] for ifo in likelihood.interferometers}
-
             for ii in tqdm(range(len(sample)), file=sys.stdout):
                 signal_polarizations =\
                     likelihood.waveform_generator.frequency_domain_strain(

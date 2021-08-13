@@ -22,10 +22,11 @@ from .pymultinest import Pymultinest
 from .ultranest import Ultranest
 from .fake_sampler import FakeSampler
 from .dnest4 import DNest4
+from bilby.bilby_mcmc import Bilby_MCMC
 from . import proposal
 
 IMPLEMENTED_SAMPLERS = {
-    'cpnest': Cpnest, 'dnest4': DNest4, 'dynamic_dynesty': DynamicDynesty,
+    'bilby_mcmc': Bilby_MCMC, 'cpnest': Cpnest, 'dnest4': DNest4, 'dynamic_dynesty': DynamicDynesty,
     'dynesty': Dynesty, 'emcee': Emcee,'kombine': Kombine, 'nessai': Nessai,
     'nestle': Nestle, 'ptemcee': Ptemcee, 'ptmcmcsampler': PTMCMCSampler,
     'pymc3': Pymc3, 'pymultinest': Pymultinest, 'pypolychord': PyPolyChord,
@@ -92,9 +93,10 @@ def run_sampler(likelihood, priors=None, label='label', outdir='outdir',
         saving. For example, if `meta_data={dtype: 'signal'}`. Warning: in case
         of conflict with keys saved by bilby, the meta_data keys will be
         overwritten.
-    save: bool
+    save: bool, str
         If true, save the priors and results to disk.
         If hdf5, save as an hdf5 file instead of json.
+        If pickle or pkl, save as an pickle file instead of json.
     gzip: bool
         If true, and save is true, gzip the saved results file.
     result_class: bilby.core.result.Result, or child of

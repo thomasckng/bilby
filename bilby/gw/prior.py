@@ -369,7 +369,6 @@ class UniformInComponentsMassRatio(Prior):
         return (self._integral(val) - self._integral(self.minimum)) / self.norm
 
     def rescale(self, val):
-        self.test_valid_for_rescaling(val)
         resc = self.icdf(val)
         if resc.ndim == 0:
             return resc.item()
@@ -958,7 +957,8 @@ class CalibrationPriorDict(PriorDict):
 
     @staticmethod
     def from_envelope_file(envelope_file, minimum_frequency,
-                           maximum_frequency, n_nodes, label):
+                           maximum_frequency, n_nodes, label,
+                           boundary="reflective"):
         """
         Load in the calibration envelope.
 
@@ -981,6 +981,8 @@ class CalibrationPriorDict(PriorDict):
             Number of nodes for the spline.
         label: str
             Label for the names of the parameters, e.g., `recalib_H1_`
+        boundary: None, 'reflective', 'periodic'
+            The type of prior boundary to assign
 
         Returns
         =======
@@ -1014,14 +1016,14 @@ class CalibrationPriorDict(PriorDict):
             prior[name] = Gaussian(mu=amplitude_mean_nodes[ii],
                                    sigma=amplitude_sigma_nodes[ii],
                                    name=name, latex_label=latex_label,
-                                   boundary='reflective')
+                                   boundary=boundary)
         for ii in range(n_nodes):
             name = "recalib_{}_phase_{}".format(label, ii)
             latex_label = "$\\phi^{}_{}$".format(label, ii)
             prior[name] = Gaussian(mu=phase_mean_nodes[ii],
                                    sigma=phase_sigma_nodes[ii],
                                    name=name, latex_label=latex_label,
-                                   boundary='reflective')
+                                   boundary=boundary)
         for ii in range(n_nodes):
             name = "recalib_{}_frequency_{}".format(label, ii)
             latex_label = "$f^{}_{}$".format(label, ii)
@@ -1112,7 +1114,7 @@ class HealPixMapPriorDist(BaseJointPriorDist):
     ==========
 
     hp_file : file path to .fits file
-        .fits file that containes the 2D or 3D Healpix Map
+        .fits file that contains the 2D or 3D Healpix Map
     names : list (optional)
         list of names of parameters included in the JointPriorDist, defaults to ['ra', 'dec']
     bounds : dict or list (optional)
@@ -1236,7 +1238,7 @@ class HealPixMapPriorDist(BaseJointPriorDist):
         Parameters
         ==========
         pix_idx : int
-            pixel index value to create the distribtuion for
+            pixel index value to create the distribution for
 
         Returns
         =======
@@ -1438,7 +1440,7 @@ class HealPixMapPriorDist(BaseJointPriorDist):
             elif isinstance(self.__dict__[key], (np.ndarray, list)):
                 thisarr = np.asarray(self.__dict__[key])
                 otherarr = np.asarray(other.__dict__[key])
-                if thisarr.dtype == np.float and otherarr.dtype == np.float:
+                if thisarr.dtype == float and otherarr.dtype == float:
                     fin1 = np.isfinite(np.asarray(self.__dict__[key]))
                     fin2 = np.isfinite(np.asarray(other.__dict__[key]))
                     if not np.array_equal(fin1, fin2):

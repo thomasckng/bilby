@@ -4,9 +4,8 @@ import sys
 import numpy as np
 
 from ...core import utils
-from ...core.utils import docstring, logger
+from ...core.utils import docstring, logger, PropertyAccessor
 from .. import utils as gwutils
-from ..utils import PropertyAccessor
 from .calibration import Recalibrate
 from .geometry import InterferometerGeometry
 from .strain_data import InterferometerStrainData
@@ -428,7 +427,7 @@ class Interferometer(object):
 
     @property
     def amplitude_spectral_density_array(self):
-        """ Returns the amplitude spectral density (ASD) given we know a power spectral denstiy (PSD)
+        """ Returns the amplitude spectral density (ASD) given we know a power spectral density (PSD)
 
         Returns
         =======
