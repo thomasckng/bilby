@@ -258,6 +258,10 @@ class TestGWUtils(unittest.TestCase):
             )
 
 
+    def test_check_if_injections_in_prior(self):
+        self.fail
+
+
 class TestSkyFrameConversion(unittest.TestCase):
 
     def setUp(self) -> None:
