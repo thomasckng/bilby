@@ -259,8 +259,23 @@ class TestGWUtils(unittest.TestCase):
 
 
     def test_check_if_injections_in_prior(self):
-        self.fail
+        injection_parameters = dict(
+            mass_1=36., mass_2=29., a_1=0.4, a_2=0.3, tilt_1=0.5, tilt_2=1.0,
+            phi_12=1.7, phi_jl=0.3, luminosity_distance=2000., theta_jn=0.4, psi=2.659,
+            phase=1.3, geocent_time=1126259642.413, ra=1.375, dec=-1.2108
+        )
+        prior = bilby.gw.prior.BBHPriorDict()
+        
+        # injection inside prior 
+        vals = check_if_injections_in_prior(data_input.injection_df, data_input.priors)
+        self.assertTrue(len(vals)==0)
 
+        # injection outside prior
+        injection_parameters['mass_1'] = 1e6
+        vals = check_if_injections_in_prior(data_input.injection_df, data_input.priors)
+        self.assertTrue(len(vals)==1)
+        # TODO: check that a warning is logged
+        
 
 class TestSkyFrameConversion(unittest.TestCase):
 
