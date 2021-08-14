@@ -164,6 +164,7 @@ class Dynesty(NestedSampler):
 
         self.resume_file = '{}/{}_resume.pickle'.format(self.outdir, self.label)
         self.sampling_time = datetime.timedelta()
+        self._sampler = None
 
         try:
             signal.signal(signal.SIGTERM, self.write_current_state_and_exit)
@@ -317,6 +318,21 @@ class Dynesty(NestedSampler):
             self.kwargs["pool"] = self.pool
             logger.info("Finished closing worker pool.")
 
+    @property
+    def sampler(self):
+        import dynesty
+        if self._sampler is None:
+            self._sampler = dynesty.NestedSampler(
+                loglikelihood=_log_likelihood_wrapper,
+                prior_transform=_prior_transform_wrapper,
+                ndim=self.ndim, **self.sampler_init_kwargs
+            )
+        return self._sampler
+
+    @sampler.setter
+    def sampler(self, sampler):
+        self._sampler = sampler
+
     def run_sampler(self):
         import dynesty
         import dill
@@ -352,11 +368,7 @@ class Dynesty(NestedSampler):
                 self.kwargs['live_points'] = (
                     self.get_initial_points_from_prior(self.kwargs['nlive'])
                 )
-            self.sampler = dynesty.NestedSampler(
-                loglikelihood=_log_likelihood_wrapper,
-                prior_transform=_prior_transform_wrapper,
-                ndim=self.ndim, **self.sampler_init_kwargs
-            )
+            _ = self.sampler
 
         if self.check_point:
             out = self._run_external_sampler_with_checkpointing()
@@ -425,11 +437,11 @@ class Dynesty(NestedSampler):
         """
         logger.debug("Calling run_nested with sampler_function_kwargs {}"
                      .format(kwargs))
-        try:
-            self.sampler.run_nested(**kwargs)
-        except TypeError:
-            kwargs.pop("n_effective")
-            self.sampler.run_nested(**kwargs)
+        kwargs['maxcall'] = self.n_check_point
+        kwargs['add_live'] = True
+        if getattr(self.sampler, "added_live", False):
+            self.sampler._remove_live_points()
+        self.sampler.run_nested(**kwargs)
 
     def _run_external_sampler_without_checkpointing(self):
         logger.debug("Running sampler without checkpointing")
@@ -439,16 +451,13 @@ class Dynesty(NestedSampler):
     def _run_external_sampler_with_checkpointing(self):
         logger.debug("Running sampler with checkpointing")
 
-        old_ncall = self.sampler.ncall
+        self.__old_ncall = self.sampler.ncall
         sampler_kwargs = self.sampler_function_kwargs.copy()
-        sampler_kwargs['maxcall'] = self.n_check_point
-        sampler_kwargs['add_live'] = True
         self.start_time = datetime.datetime.now()
         while True:
             self._run_nested_wrapper(sampler_kwargs)
-            if self.sampler.ncall == old_ncall:
+            if self._check_converged():
                 break
-            old_ncall = self.sampler.ncall
 
             if os.path.isfile(self.resume_file):
                 last_checkpoint_s = time.time() - os.path.getmtime(self.resume_file)
@@ -457,14 +466,16 @@ class Dynesty(NestedSampler):
             if last_checkpoint_s > self.check_point_delta_t:
                 self.write_current_state()
                 self.plot_current_state()
-            if self.sampler.added_live:
-                self.sampler._remove_live_points()
 
-        sampler_kwargs['add_live'] = True
         self._run_nested_wrapper(sampler_kwargs)
         self.write_current_state()
         self.plot_current_state()
         return self.sampler.results
+
+    def _check_converged(self):
+        converged = self.sampler.ncall == self.__old_ncall
+        self.__old_ncall = self.sampler.ncall
+        return converged
 
     def _remove_checkpoint(self):
         """Remove checkpointed state"""
@@ -520,7 +531,7 @@ class Dynesty(NestedSampler):
                         ))
                 del sampler.versions
                 self.sampler = sampler
-                if self.sampler.added_live and continuing:
+                if getattr(sampler, "added_live", False) and continuing:
                     self.sampler._remove_live_points()
                 self.sampler.nqueue = -1
                 self.sampler.rstate = np.random

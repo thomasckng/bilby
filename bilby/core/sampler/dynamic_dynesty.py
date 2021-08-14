@@ -1,12 +1,7 @@
-
-import os
-import signal
-
 import numpy as np
 
-from ..utils import logger, check_directory_exists_and_if_not_mkdir
-from .base_sampler import Sampler
-from .dynesty import Dynesty
+from ..utils import logger
+from .dynesty import Dynesty, _log_likelihood_wrapper, _prior_transform_wrapper
 
 
 class DynamicDynesty(Dynesty):
@@ -77,34 +72,11 @@ class DynamicDynesty(Dynesty):
                           dlogz_init=0.01, logl_max_init=np.inf, nlive_batch=500,
                           wt_function=None, wt_kwargs=None, maxiter_batch=None,
                           maxcall_batch=None, maxiter=None, maxcall=None,
-                          maxbatch=None, stop_function=None, stop_kwargs=None,
+                          maxbatch=0, stop_function=None, stop_kwargs=None,
                           use_stop=True, save_bounds=True,
                           print_progress=True, print_func=None, live_points=None,
+                          maxmcmc=1000, nact=5, mcmc_scale="normal", adapt_tscale=100,
                           )
-
-    def __init__(self, likelihood, priors, outdir='outdir', label='label', use_ratio=False, plot=False,
-                 skip_import_verification=False, check_point=True, n_check_point=None, check_point_delta_t=600,
-                 resume=True, **kwargs):
-        super(DynamicDynesty, self).__init__(likelihood=likelihood, priors=priors,
-                                             outdir=outdir, label=label, use_ratio=use_ratio,
-                                             plot=plot, skip_import_verification=skip_import_verification,
-                                             **kwargs)
-        self.n_check_point = n_check_point
-        self.check_point = check_point
-        self.resume = resume
-        if self.n_check_point is None:
-            # If the log_likelihood_eval_time is not calculable then
-            # check_point is set to False.
-            if np.isnan(self._log_likelihood_eval_time):
-                self.check_point = False
-            n_check_point_raw = (check_point_delta_t / self._log_likelihood_eval_time)
-            n_check_point_rnd = int(float("{:1.0g}".format(n_check_point_raw)))
-            self.n_check_point = n_check_point_rnd
-
-        self.resume_file = '{}/{}_resume.pickle'.format(self.outdir, self.label)
-
-        signal.signal(signal.SIGTERM, self.write_current_state_and_exit)
-        signal.signal(signal.SIGINT, self.write_current_state_and_exit)
 
     @property
     def external_sampler_name(self):
@@ -119,72 +91,113 @@ class DynamicDynesty(Dynesty):
                 'save_bounds', 'print_progress', 'print_func', 'live_points']
         return {key: self.kwargs[key] for key in keys}
 
-    def run_sampler(self):
+    @property
+    def sampler(self):
         import dynesty
-        self.sampler = dynesty.DynamicNestedSampler(
-            loglikelihood=self.log_likelihood,
-            prior_transform=self.prior_transform,
-            ndim=self.ndim, **self.sampler_init_kwargs)
+        if self._sampler is None:
+            self._sampler = dynesty.DynamicNestedSampler(
+                loglikelihood=_log_likelihood_wrapper,
+                prior_transform=_prior_transform_wrapper,
+                ndim=self.ndim, **self.sampler_init_kwargs
+            )
+        return self._sampler
 
-        if self.check_point:
-            out = self._run_external_sampler_with_checkpointing()
-        else:
-            out = self._run_external_sampler_without_checkpointing()
+    @sampler.setter
+    def sampler(self, sampler):
+        self._sampler = sampler
 
-        # Flushes the output to force a line break
-        if self.kwargs["verbose"]:
-            print("")
-
-        # self.result.sampler_output = out
-        self._generate_result(out)
-        if self.plot:
-            self.generate_trace_plots(out)
-
-        return self.result
+    def run_sampler(self):
+        self.kwargs["nlive"] = self.kwargs["nlive_init"]
+        return super(DynamicDynesty, self).run_sampler()
 
     def _run_external_sampler_with_checkpointing(self):
-        logger.debug("Running sampler with checkpointing")
-        if self.resume:
-            resume = self.read_saved_state(continuing=True)
-            if resume:
-                logger.info('Resuming from previous run.')
+        return super(DynamicDynesty, self)._run_external_sampler_with_checkpointing()
 
-        old_ncall = self.sampler.ncall
-        sampler_kwargs = self.sampler_function_kwargs.copy()
-        sampler_kwargs['maxcall'] = self.n_check_point
-        while True:
-            sampler_kwargs['maxcall'] += self.n_check_point
-            self.sampler.run_nested(**sampler_kwargs)
-            if self.sampler.ncall == old_ncall:
-                break
-            old_ncall = self.sampler.ncall
+    def _check_converged(self):
+        from dynesty.dynamicsampler import stopping_function
+        if self.kwargs.get("stop_function", None) is None:
+            stop_function = stopping_function
+        else:
+            stop_function = stopping_function
+        stop = stop_function(
+            self.sampler.results, self.kwargs["stop_kwargs"],
+            rstate=np.random,
+            M=map,
+            return_vals=False
+        )
+        return stop
 
-            self.write_current_state()
+    def _run_nested_wrapper(self, kwargs):
+        """ Wrapper function to run_nested
 
-        self._remove_checkpoint()
-        return self.sampler.results
+        This wrapper catches exceptions related to different versions of
+        dynesty accepting different arguments.
+
+        Parameters
+        ==========
+        kwargs: dict
+            The dictionary of kwargs to pass to run_nested
+
+        """
+        logger.debug("Calling run_nested with sampler_function_kwargs {}"
+                     .format(kwargs))
+        kwargs["maxbatch"] += 1
+        self.sampler.run_nested(**kwargs)
 
     def write_current_state(self):
-        """
-        """
-        import dill
-        check_directory_exists_and_if_not_mkdir(self.outdir)
-        with open(self.resume_file, 'wb') as file:
-            dill.dump(self, file)
-
-    def read_saved_state(self, continuing=False):
-        """
-        """
-        import dill
-
-        logger.debug("Reading resume file {}".format(self.resume_file))
-        if os.path.isfile(self.resume_file):
-            with open(self.resume_file, 'rb') as file:
-                self = dill.load(file)
-        else:
-            logger.debug(
-                "Failed to read resume file {}".format(self.resume_file))
-            return False
+        super(DynamicDynesty, self).write_current_state()
+        self.sampler.sampler.pool = self.pool
+        self.sampler.sampler.rstate = self.kwargs["rstate"]
+        if self.sampler.sampler.pool is not None:
+            self.sampler.sampler.M = self.sampler.pool.map
 
     def _verify_kwargs_against_default_kwargs(self):
-        Sampler._verify_kwargs_against_default_kwargs(self)
+        super(DynamicDynesty, self)._verify_kwargs_against_default_kwargs()
+        if self.kwargs["rstate"] is None:
+            self.kwargs["rstate"] = np.random
+
+    def _print_func(
+            self, results, niter, ncall=None, dlogz=None, nbatch=0, stop_val=None,
+            logl_min=-np.inf, logl_max=np.inf,
+            *args, **kwargs
+    ):
+        """ Replacing status update for dynesty.result.print_func """
+
+        # Extract results at the current iteration.
+        (worst, ustar, vstar, loglstar, logvol, logwt,
+         logz, logzvar, h, nc, worst_it, boundidx, bounditer,
+         eff, delta_logz) = results
+
+        # Adjusting outputs for printing.
+        if delta_logz > 1e6:
+            delta_logz = np.inf
+        if 0. <= logzvar <= 1e6:
+            logzerr = np.sqrt(logzvar)
+        else:
+            logzerr = np.nan
+        if logz <= -1e6:
+            logz = -np.inf
+        if loglstar <= -1e6:
+            loglstar = -np.inf
+
+        if self.use_ratio:
+            key = 'logz-ratio'
+        else:
+            key = 'logz'
+
+        # Constructing output.
+        string = []
+        string.append("bound:{:d}".format(bounditer))
+        string.append("nc:{:3d}".format(nc))
+        string.append("ncall:{:.1e}".format(ncall))
+        string.append("eff:{:0.1f}%".format(eff))
+        string.append("{}={:0.2f}+/-{:0.2f}".format(key, logz, logzerr))
+        if dlogz is None:
+            string.append("logl:{:.3e}<{:.3e}<{:.3e}".format(logl_min, loglstar, logl_max))
+            string.append("nbatch:{:d}".format(nbatch))
+            string.append("stop:{:.3f}".format(stop_val))
+        else:
+            string.append("dlogz:{:0.3f}>{:0.2g}".format(delta_logz, dlogz))
+
+        self.pbar.set_postfix_str(" ".join(string), refresh=False)
+        self.pbar.update(niter - self.pbar.n)
