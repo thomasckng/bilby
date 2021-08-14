@@ -147,14 +147,12 @@ class DynamicDynesty(Dynesty):
     def write_current_state(self):
         super(DynamicDynesty, self).write_current_state()
         self.sampler.sampler.pool = self.pool
-        self.sampler.sampler.rstate = self.kwargs["rstate"]
+        if self.kwargs["rstate"] is None:
+            self.sampler.sampler.rstate = np.random
+        else:
+            self.sampler.sampler.rstate = self.kwargs["rstate"]
         if self.sampler.sampler.pool is not None:
             self.sampler.sampler.M = self.sampler.pool.map
-
-    def _verify_kwargs_against_default_kwargs(self):
-        super(DynamicDynesty, self)._verify_kwargs_against_default_kwargs()
-        if self.kwargs["rstate"] is None:
-            self.kwargs["rstate"] = np.random
 
     def _print_func(
             self, results, niter, ncall=None, dlogz=None, nbatch=0, stop_val=None,
