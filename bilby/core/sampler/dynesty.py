@@ -669,7 +669,7 @@ class Dynesty(NestedSampler):
                 fig, axs = dynesty_stats_plot(self.sampler)
                 fig.tight_layout()
                 plt.savefig(filename)
-            except (RuntimeError, ValueError) as e:
+            except (RuntimeError, ValueError, AttributeError) as e:
                 logger.warning(e)
                 logger.warning('Failed to create dynesty stats plot at checkpoint')
             finally:
@@ -909,6 +909,7 @@ def dynesty_stats_plot(sampler):
         ax.set_ylabel(name.title())
     lifetimes = np.arange(len(sampler.saved_it)) - sampler.saved_it
     axs[-2].set_ylabel("Lifetime")
+    print(sampler.__dict__)
     nlive = sampler.nlive
     burn = int(geom(p=1 / nlive).isf(1 / 2 / nlive))
     if len(sampler.saved_it) > burn + sampler.nlive:
