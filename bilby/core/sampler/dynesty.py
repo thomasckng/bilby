@@ -759,8 +759,8 @@ def sample_rwalk_bilby(args):
     v = prior_transform(u)
     logl = loglikelihood(np.array(v))
 
-    # +1 to ensure at least one iteration no matter what
-    for ii in range(round(nact * old_act) + 1):
+    # ensure at least one iteration no matter what
+    for ii in range(max(round(nact * old_act), 1)):
         # Propose a direction on the unit n-sphere.
         drhat = rstate.randn(n)
         drhat /= np.linalg.norm(drhat)
@@ -808,6 +808,12 @@ def sample_rwalk_bilby(args):
             "or reparameterizing for better sampling efficiency".format(maxmcmc))
 
     old_act = estimate_act(accept, reject, nfail, old_act, adapt_tscale)
+    
+if accept == 0:
+        logger.debug("Unable to find a new point using walk: returning a random point")
+        u = np.random.uniform(size=n)
+        v = prior_transform(u)
+        logl = loglikelihood(v)
 
     blob = {'accept': accept, 'reject': reject + nfail, 'fail': nfail, 'scale': scale}
 
