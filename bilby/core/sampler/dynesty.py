@@ -835,7 +835,7 @@ def sample_rwalk_bilby(args):
             "or reparameterizing for better sampling efficiency".format(maxmcmc))
 
     old_act = estimate_act(accept, reject, nfail, old_act, adapt_tscale)
-    
+
     if accept == 0:
         logger.debug("Unable to find a new point using walk: returning a random point")
         u = np.random.uniform(size=n)

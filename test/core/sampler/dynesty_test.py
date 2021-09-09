@@ -66,7 +66,7 @@ class TestDynesty(unittest.TestCase):
             n_effective=None,
             maxmcmc=5000,
             nact=1,
-            adapt_tscale=100
+            adapt_tscale=100,
             print_method="tqdm",
         )
         self.sampler.kwargs[
@@ -124,7 +124,7 @@ class TestDynesty(unittest.TestCase):
             n_effective=None,
             maxmcmc=5000,
             nact=1,
-            adapt_tscale=100
+            adapt_tscale=100,
             print_method="tqdm",
         )
 
