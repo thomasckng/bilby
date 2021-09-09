@@ -1,4 +1,4 @@
-dynesty
+dynesty<1.1
 emcee
 corner
 numpy
@@ -10,4 +10,5 @@ dill
 tqdm
 h5py
 tables
-astropy<4.3
+astropy
+attrs

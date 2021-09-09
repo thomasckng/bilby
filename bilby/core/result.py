@@ -1,3 +1,4 @@
+import datetime
 import inspect
 import json
 import os
@@ -23,6 +24,9 @@ from .utils import (
     recursively_decode_bilby_json,
 )
 from .prior import Prior, PriorDict, DeltaFunction, ConditionalDeltaFunction
+
+
+EXTENSIONS = ["json", "hdf5", "h5", "pickle", "pkl"]
 
 
 def result_file_name(outdir, label, extension='json', gzip=False):
@@ -359,7 +363,7 @@ class Result(object):
             The number of times the likelihood function is called
         log_prior_evaluations: array_like
             The evaluations of the prior for each sample point
-        sampling_time: float
+        sampling_time: (datetime.timedelta, float)
             The time taken to complete the sampling
         nburn: int
             The number of burn-in steps discarded for MCMC samplers
@@ -409,6 +413,8 @@ class Result(object):
         self.log_likelihood_evaluations = log_likelihood_evaluations
         self.log_prior_evaluations = log_prior_evaluations
         self.num_likelihood_evaluations = num_likelihood_evaluations
+        if isinstance(sampling_time, float):
+            sampling_time = datetime.timedelta(seconds=sampling_time)
         self.sampling_time = sampling_time
         self.version = version
         self.max_autocorrelation_time = max_autocorrelation_time
