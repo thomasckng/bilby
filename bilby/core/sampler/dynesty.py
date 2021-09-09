@@ -22,6 +22,7 @@ _likelihood = None
 _priors = None
 _search_parameter_keys = None
 _use_ratio = False
+old_act = None
 
 
 def _initialize_global_variables(
@@ -587,6 +588,10 @@ class Dynesty(NestedSampler):
         self.sampler.versions = dict(
             bilby=bilby_version, dynesty=dynesty_version
         )
+        self.sampler.kwargs["walks"] = max(int(
+            np.mean(self.sampler.saved_nc[-self.kwargs["queue_size"]:])
+            / self.kwargs["nact"]
+        ), 1)
         self.sampler.pool = None
         self.sampler.M = map
         if dill.pickles(self.sampler):
@@ -722,6 +727,7 @@ class Dynesty(NestedSampler):
 def sample_rwalk_bilby(args):
     """ Modified bilby-implemented version of dynesty.sampling.sample_rwalk """
     from dynesty.utils import unitcheck
+    global old_act
 
     # Unzipping.
     (u, loglstar, axes, scale,
@@ -741,7 +747,8 @@ def sample_rwalk_bilby(args):
 
     # In the absence of any other information, the first live point replacement
     # will have `walks` iterations
-    old_act = kwargs.get('old_act', walks / nact)
+    if old_act is None:
+        old_act = walks / nact
 
     adapt_tscale = kwargs.get('adapt_tscale', 100)
 
@@ -800,10 +807,9 @@ def sample_rwalk_bilby(args):
             "If this warning occurs often, try increasing maxmcmc "
             "or reparameterizing for better sampling efficiency".format(maxmcmc))
 
-    act = estimate_act(accept, reject, nfail, old_act, adapt_tscale)
+    old_act = estimate_act(accept, reject, nfail, old_act, adapt_tscale)
 
     blob = {'accept': accept, 'reject': reject + nfail, 'fail': nfail, 'scale': scale}
-    kwargs["old_act"] = act
 
     ncall = accept + reject + nfail
     return u, v, logl, ncall, blob
