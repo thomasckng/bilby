@@ -271,7 +271,7 @@ class PriorDict(dict):
             else:
                 logger.debug(
                     "{} cannot be converted to delta function prior."
-                        .format(key))
+                    .format(key))
 
     def fill_priors(self, likelihood, default_priors_file=None):
         """
@@ -310,7 +310,7 @@ class PriorDict(dict):
                     logger.warning(
                         "Parameter {} has no default prior and is set to {}, this"
                         " will not be sampled and may cause an error."
-                            .format(missing_key, set_val))
+                        .format(missing_key, set_val))
                 else:
                     self[missing_key] = default_prior
 
