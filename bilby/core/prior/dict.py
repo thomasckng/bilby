@@ -271,7 +271,7 @@ class PriorDict(dict):
             else:
                 logger.debug(
                     "{} cannot be converted to delta function prior."
-                    .format(key))
+                        .format(key))
 
     def fill_priors(self, likelihood, default_priors_file=None):
         """
@@ -310,7 +310,7 @@ class PriorDict(dict):
                     logger.warning(
                         "Parameter {} has no default prior and is set to {}, this"
                         " will not be sampled and may cause an error."
-                        .format(missing_key, set_val))
+                            .format(missing_key, set_val))
                 else:
                     self[missing_key] = default_prior
 
@@ -579,6 +579,44 @@ class PriorDict(dict):
         defaults.
         """
         return self.__class__(dictionary=dict(self))
+
+    def test_sample(self, sample):
+        """
+        Test if the sample inside the prior
+
+        Parameters
+        ----------
+        sample: dict[label, value]
+            Dictionary of the samples of which to check
+
+        Returns
+        =======
+        bool: Whether the sample is inside the prior
+        """
+
+        ln_prob = np.inf
+        try:
+            ln_prob = self.ln_prob(sample)
+        except KeyError as e:  # when samples contain unrecognised paramters
+            logger.debug(f"Either the prior or sample have invalid parameters: {e}")
+
+        return np.isfinite(ln_prob)
+
+    def test_samples(self, samples):
+        """
+        Test if a list of samples inside the prior
+
+        Parameters
+        ----------
+        samples: dict[label, list_of_values]
+            Dictionary of the samples of which to check
+        """
+        invalid = []
+        list_of_samples = [dict(zip(samples, t)) for t in zip(*samples.values())]
+        for idx, sample in enumerate(list_of_samples):
+            if not self.test_sample(sample):
+                invalid.append(idx)
+        return invalid
 
 
 class PriorDictException(Exception):

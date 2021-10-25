@@ -317,6 +317,18 @@ class TestPriorDict(unittest.TestCase):
             self.assertFalse(self.prior_set_from_dict.test_redundancy(key=key))
 
 
+    def test_samples_test(self):
+        prior = bilby.core.prior.PriorDict(dictionary=self.default_prior_file)
+        samples = prior.sample(10)
+        invalid = prior.test_samples(samples)
+        self.assertEqual(len(invalid), 0)
+        bad_id = 0
+        samples['chirp_mass'][bad_id] = 1000
+        invalid = prior.test_samples(samples)
+        self.assertListEqual(invalid, [bad_id])
+
+
+
 class TestJsonIO(unittest.TestCase):
     def setUp(self):
         mvg = bilby.core.prior.MultivariateGaussianDist(
