@@ -204,7 +204,7 @@ plotting-python-3.7:
 #    - schedules
   script:
     - python -m pip install .
-    - python -m pip install ligo.skymap>=0.5.3
+    - python -m pip install "ligo.skymap>=0.5.3"
     - pytest test/gw/plot_test.py
 
 
@@ -216,7 +216,7 @@ plotting-python-3.9:
   #    - schedules
   script:
     - python -m pip install .
-    - python -m pip install ligo.skymap>=0.5.3
+    - python -m pip install "ligo.skymap>=0.5.3"
     - pytest test/gw/plot_test.py
 
 
