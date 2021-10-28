@@ -200,8 +200,20 @@ plotting-python-3.7:
   stage: test
   image: containers.ligo.org/lscsoft/bilby/v2-bilby-python37
   needs: ["basic-3.7", "precommits-py3.7"]
-  only:
-    - schedules
+#  only:
+#    - schedules
+  script:
+    - python -m pip install .
+    - python -m pip install ligo.skymap
+    - pytest test/gw/plot_test.py
+
+
+plotting-python-3.9:
+  stage: test
+  image: containers.ligo.org/lscsoft/bilby/v2-bilby-python37
+  needs: ["basic-3.9", "precommits-py3.9"]
+  #  only:
+  #    - schedules
   script:
     - python -m pip install .
     - python -m pip install ligo.skymap
