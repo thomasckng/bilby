@@ -1,20 +1,15 @@
-
 import datetime
-import distutils.dir_util
 import inspect
-import os
-import shutil
-import signal
 import time
 
 import numpy as np
 from pandas import DataFrame
 
-from ..utils import check_directory_exists_and_if_not_mkdir, logger
-from .base_sampler import NestedSampler
+from ..utils import logger
+from .base_sampler import NestedSampler, _TemporaryFileSampler
 
 
-class Ultranest(NestedSampler):
+class Ultranest(_TemporaryFileSampler, NestedSampler):
     """
     bilby wrapper of ultranest
     (https://johannesbuchner.github.io/UltraNest/index.html)
@@ -73,6 +68,8 @@ class Ultranest(NestedSampler):
         step_sampler=None,
     )
 
+    short_name = "ultra"
+
     def __init__(
         self,
         likelihood,
@@ -96,19 +93,14 @@ class Ultranest(NestedSampler):
             plot=plot,
             skip_import_verification=skip_import_verification,
             exit_code=exit_code,
+            temporary_directory=temporary_directory,
             **kwargs,
         )
-        self._apply_ultranest_boundaries()
-        self.use_temporary_directory = temporary_directory
 
         if self.use_temporary_directory:
             # set callback interval, so copying of results does not thrash the
             # disk (ultranest will call viz_callback quite a lot)
             self.callback_interval = callback_interval
-
-        signal.signal(signal.SIGTERM, self.write_current_state_and_exit)
-        signal.signal(signal.SIGINT, self.write_current_state_and_exit)
-        signal.signal(signal.SIGALRM, self.write_current_state_and_exit)
 
     def _translate_kwargs(self, kwargs):
         if "num_live_points" not in kwargs:
@@ -135,89 +127,13 @@ class Ultranest(NestedSampler):
                 self._calculate_and_save_sampling_time()
             self._viz_callback_counter += 1
 
-    def _apply_ultranest_boundaries(self):
-        if (
-            self.kwargs["wrapped_params"] is None
-            or len(self.kwargs.get("wrapped_params", [])) == 0
-        ):
-            self.kwargs["wrapped_params"] = []
-            for param, value in self.priors.items():
-                if param in self.search_parameter_keys:
-                    if value.boundary == "periodic":
-                        self.kwargs["wrapped_params"].append(1)
-                    else:
-                        self.kwargs["wrapped_params"].append(0)
-
-    @property
-    def outputfiles_basename(self):
-        return self._outputfiles_basename
-
-    @outputfiles_basename.setter
-    def outputfiles_basename(self, outputfiles_basename):
-        if outputfiles_basename is None:
-            outputfiles_basename = os.path.join(
-                self.outdir, "ultra_{}/".format(self.label)
-            )
-        if not outputfiles_basename.endswith("/"):
-            outputfiles_basename += "/"
-        check_directory_exists_and_if_not_mkdir(self.outdir)
-        self._outputfiles_basename = outputfiles_basename
-
-    @property
-    def temporary_outputfiles_basename(self):
-        return self._temporary_outputfiles_basename
-
-    @temporary_outputfiles_basename.setter
-    def temporary_outputfiles_basename(self, temporary_outputfiles_basename):
-        if not temporary_outputfiles_basename.endswith("/"):
-            temporary_outputfiles_basename = "{}/".format(
-                temporary_outputfiles_basename
-            )
-        self._temporary_outputfiles_basename = temporary_outputfiles_basename
-        if os.path.exists(self.outputfiles_basename):
-            shutil.copytree(
-                self.outputfiles_basename, self.temporary_outputfiles_basename
-            )
-
-    def write_current_state_and_exit(self, signum=None, frame=None):
-        """ Write current state and exit on exit_code """
-        logger.info(
-            "Run interrupted by signal {}: checkpoint and exit on {}".format(
-                signum, self.exit_code
-            )
-        )
-        self._calculate_and_save_sampling_time()
-        if self.use_temporary_directory:
-            self._move_temporary_directory_to_proper_path()
-        os._exit(self.exit_code)
-
     def _copy_temporary_directory_contents_to_proper_path(self):
         """
         Copy the temporary back to the proper path.
         Do not delete the temporary directory.
         """
         if inspect.stack()[1].function != "_viz_callback":
-            logger.info(
-                "Overwriting {} with {}".format(
-                    self.outputfiles_basename, self.temporary_outputfiles_basename
-                )
-            )
-        if self.outputfiles_basename.endswith("/"):
-            outputfiles_basename_stripped = self.outputfiles_basename[:-1]
-        else:
-            outputfiles_basename_stripped = self.outputfiles_basename
-        distutils.dir_util.copy_tree(
-            self.temporary_outputfiles_basename, outputfiles_basename_stripped
-        )
-
-    def _move_temporary_directory_to_proper_path(self):
-        """
-        Move the temporary back to the proper path
-
-        Anything in the proper path at this point is removed including links
-        """
-        self._copy_temporary_directory_contents_to_proper_path()
-        shutil.rmtree(self.temporary_outputfiles_basename)
+            super(Ultranest, self)._copy_temporary_directory_contents_to_proper_path()
 
     @property
     def sampler_function_kwargs(self):
@@ -285,7 +201,7 @@ class Ultranest(NestedSampler):
         stepsampler = self.kwargs.pop("step_sampler", None)
 
         self._setup_run_directory()
-        self.kwargs["log_dir"] = self.kwargs.pop("outputfiles_basename")
+        self.kwargs["log_dir"] = self.kwargs["outputfiles_basename"]
         self._check_and_load_sampling_time_file()
 
         # use reactive nested sampler when no live points are given
@@ -324,27 +240,6 @@ class Ultranest(NestedSampler):
         self.calc_likelihood_count()
 
         return self.result
-
-    def _clean_up_run_directory(self):
-        if self.use_temporary_directory:
-            self._move_temporary_directory_to_proper_path()
-            self.kwargs["log_dir"] = self.outputfiles_basename
-
-    def _check_and_load_sampling_time_file(self):
-        self.time_file_path = os.path.join(self.kwargs["log_dir"], "sampling_time.dat")
-        if os.path.exists(self.time_file_path):
-            with open(self.time_file_path, "r") as time_file:
-                self.total_sampling_time = float(time_file.readline())
-        else:
-            self.total_sampling_time = 0
-
-    def _calculate_and_save_sampling_time(self):
-        current_time = time.time()
-        new_sampling_time = current_time - self.start_time
-        self.total_sampling_time += new_sampling_time
-        with open(self.time_file_path, "w") as time_file:
-            time_file.write(str(self.total_sampling_time))
-        self.start_time = current_time
 
     def _generate_result(self, out):
         # extract results

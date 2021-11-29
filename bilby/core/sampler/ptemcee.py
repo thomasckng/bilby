@@ -2,8 +2,6 @@ import copy
 import datetime
 import logging
 import os
-import signal
-import sys
 import time
 from collections import namedtuple
 
@@ -11,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from ..utils import logger, check_directory_exists_and_if_not_mkdir
-from .base_sampler import SamplerError, MCMCSampler
+from .base_sampler import SamplerError, MCMCSampler, signal_wrapper, _sampling_convenience_dump, _initialize_global_variables
 
 
 ConvergenceInputs = namedtuple(
@@ -185,11 +183,6 @@ class Ptemcee(MCMCSampler):
         self.nwalkers = self.sampler_init_kwargs["nwalkers"]
         self.ntemps = self.sampler_init_kwargs["ntemps"]
         self.max_steps = 500
-
-        # Setup up signal handling
-        signal.signal(signal.SIGTERM, self.write_current_state_and_exit)
-        signal.signal(signal.SIGINT, self.write_current_state_and_exit)
-        signal.signal(signal.SIGALRM, self.write_current_state_and_exit)
 
         # Checkpointing inputs
         self.resume = resume
@@ -427,9 +420,7 @@ class Ptemcee(MCMCSampler):
                     **self.sampler_init_kwargs
                 )
 
-                self.sampler._likeprior = LikePriorEvaluator(
-                    self.search_parameter_keys, use_ratio=self.use_ratio
-                )
+                self.sampler._likeprior = LikePriorEvaluator()
 
             # Initialize storing results
             self.iteration = 0
@@ -464,20 +455,9 @@ class Ptemcee(MCMCSampler):
         else:
             raise SamplerError("pos0={} not implemented".format(self.pos0))
 
-    def setup_pool(self):
-        """ If threads > 1, setup a MultiPool, else run in serial mode """
-        if self.threads > 1:
-            import schwimmbad
-
-            logger.info("Creating MultiPool with {} processes".format(self.threads))
-            self.pool = schwimmbad.MultiPool(
-                self.threads, initializer=init, initargs=(self.likelihood, self.priors)
-            )
-        else:
-            self.pool = None
-
+    @signal_wrapper
     def run_sampler(self):
-        self.setup_pool()
+        self._setup_pool()
         sampler = self.setup_sampler()
 
         t0 = datetime.datetime.now()
@@ -603,16 +583,6 @@ class Ptemcee(MCMCSampler):
             self.pool.close()
 
         return self.result
-
-    def write_current_state_and_exit(self, signum=None, frame=None):
-        logger.warning("Run terminated with signal {}".format(signum))
-        if getattr(self, "pool", None) or self.threads == 1:
-            self.write_current_state(plot=False)
-        if getattr(self, "pool", None):
-            logger.info("Closing pool")
-            self.pool.close()
-        logger.info("Exit on signal {}".format(self.exit_code))
-        sys.exit(self.exit_code)
 
     def write_current_state(self, plot=True):
         check_directory_exists_and_if_not_mkdir(self.outdir)
@@ -1154,17 +1124,6 @@ def do_nothing_function():
     pass
 
 
-likelihood = None
-priors = None
-
-
-def init(likelihood_in, priors_in):
-    global likelihood
-    global priors
-    likelihood = likelihood_in
-    priors = priors_in
-
-
 class LikePriorEvaluator(object):
     """
     This class is copied and modified from ptemcee.LikePriorEvaluator, see
@@ -1176,21 +1135,21 @@ class LikePriorEvaluator(object):
 
     """
 
-    def __init__(self, search_parameter_keys, use_ratio=False):
-        self.search_parameter_keys = search_parameter_keys
-        self.use_ratio = use_ratio
+    def __init__(self):
         self.periodic_set = False
 
     def _setup_periodic(self):
+        priors = _sampling_convenience_dump.priors
+        search_parameter_keys = _sampling_convenience_dump.search_parameter_keys
         self._periodic = [
-            priors[key].boundary == "periodic" for key in self.search_parameter_keys
+            priors[key].boundary == "periodic" for key in search_parameter_keys
         ]
         priors.sample()
         self._minima = np.array([
-            priors[key].minimum for key in self.search_parameter_keys
+            priors[key].minimum for key in search_parameter_keys
         ])
         self._range = np.array([
-            priors[key].maximum for key in self.search_parameter_keys
+            priors[key].maximum for key in search_parameter_keys
         ]) - self._minima
         self.periodic_set = True
 
@@ -1204,10 +1163,13 @@ class LikePriorEvaluator(object):
         return array
 
     def logl(self, v_array):
-        parameters = {key: v for key, v in zip(self.search_parameter_keys, v_array)}
+        priors = _sampling_convenience_dump.priors
+        likelihood = _sampling_convenience_dump.likelihood
+        search_parameter_keys = _sampling_convenience_dump.search_parameter_keys
+        parameters = {key: v for key, v in zip(search_parameter_keys, v_array)}
         if priors.evaluate_constraints(parameters) > 0:
             likelihood.parameters.update(parameters)
-            if self.use_ratio:
+            if _sampling_convenience_dump.use_ratio:
                 return likelihood.log_likelihood() - likelihood.noise_log_likelihood()
             else:
                 return likelihood.log_likelihood()
@@ -1215,7 +1177,9 @@ class LikePriorEvaluator(object):
             return np.nan_to_num(-np.inf)
 
     def logp(self, v_array):
-        params = {key: t for key, t in zip(self.search_parameter_keys, v_array)}
+        priors = _sampling_convenience_dump.priors
+        search_parameter_keys = _sampling_convenience_dump.search_parameter_keys
+        params = {key: t for key, t in zip(search_parameter_keys, v_array)}
         return priors.ln_prob(params)
 
     def __call__(self, x):

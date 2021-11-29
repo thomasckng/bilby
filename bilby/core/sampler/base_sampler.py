@@ -1,5 +1,11 @@
 import datetime
 import distutils.dir_util
+import shutil
+import signal
+import sys
+import time
+
+import attr
 import numpy as np
 import os
 import tempfile
@@ -9,6 +15,88 @@ from pandas import DataFrame
 from ..utils import logger, check_directory_exists_and_if_not_mkdir, command_line_args, Counter
 from ..prior import Prior, PriorDict, DeltaFunction, Constraint
 from ..result import Result, read_in_result
+
+
+@attr.s
+class _SamplingContainer:
+    """
+    A container class for objects that are stored independently in each thread
+    for some samplers.
+
+    A single instance of this will appear in this module that can be access
+    by the individual samplers.
+
+    This includes the:
+
+    - likelihood (bilby.core.likelihood.Likelihood)
+    - priors (bilby.core.prior.PriorDict)
+    - search_parameter_keys (list)
+    - use_ratio (bool)
+    """
+    likelihood = attr.ib(default=None)
+    priors = attr.ib(default=None)
+    search_parameter_keys = attr.ib(default=None)
+    use_ratio = attr.ib(default=False)
+
+
+_sampling_convenience_dump = _SamplingContainer()
+
+
+def _initialize_global_variables(
+        likelihood,
+        priors,
+        search_parameter_keys,
+        use_ratio,
+):
+    """
+    Store a global copy of the likelihood, priors, and search keys for
+    multiprocessing.
+    """
+    global _sampling_convenience_dump
+    _sampling_convenience_dump.likelihood = likelihood
+    _sampling_convenience_dump.priors = priors
+    _sampling_convenience_dump.search_parameter_keys = search_parameter_keys
+    _sampling_convenience_dump.use_ratio = use_ratio
+
+
+def signal_wrapper(method):
+    """
+    Decorator to wrap a method of a class to set system signals before running
+    and reset them after.
+
+    Parameters
+    ==========
+    method: callable
+        The method to call, this assumes the first argument is `self`
+        and that `self` has a `write_current_state_and_exit` method.
+
+    Returns
+    =======
+    output: callable
+        The wrapped method.
+    """
+
+    def wrapped(self, *args, **kwargs):
+        try:
+            old_term = signal.signal(signal.SIGTERM, self.write_current_state_and_exit)
+            old_int = signal.signal(signal.SIGINT, self.write_current_state_and_exit)
+            old_alarm = signal.signal(signal.SIGALRM, self.write_current_state_and_exit)
+            _set = True
+        except AttributeError:
+            _set = False
+            logger.debug(
+                "Setting signal attributes unavailable on this system. "
+                "This is likely the case if you are running on a Windows machine "
+                "and can be safely ignored."
+            )
+        output = method(self, *args, **kwargs)
+        if _set:
+            signal.signal(signal.SIGTERM, old_term)
+            signal.signal(signal.SIGINT, old_int)
+            signal.signal(signal.SIGALRM, old_alarm)
+        return output
+
+    return wrapped
 
 
 class Sampler(object):
@@ -539,6 +627,76 @@ class Sampler(object):
         else:
             return None
 
+    @property
+    def npool(self):
+        for key in self.npool_equiv_kwargs:
+            if key in self.kwargs:
+                return self.kwargs[key]
+        return 1
+
+    def _log_interruption(self, signum=None):
+        if signum == 14:
+            logger.info(
+                "Run interrupted by alarm signal {}: checkpoint and exit on {}"
+                .format(signum, self.exit_code)
+            )
+        else:
+            logger.info(
+                "Run interrupted by signal {}: checkpoint and exit on {}"
+                .format(signum, self.exit_code)
+            )
+
+    def write_current_state_and_exit(self, signum=None, frame=None):
+        """
+        Make sure that if a pool of jobs is running only the parent tries to
+        checkpoint and exit. Only the parent has a 'pool' attribute.
+        """
+        if self.npool == 1 or getattr(self, "pool", None) is not None:
+            self._log_interruption(signum=signum)
+            self.write_current_state()
+            self._close_pool()
+            sys.exit(self.exit_code)
+
+    def _close_pool(self):
+        if getattr(self, "pool", None) is not None:
+            logger.info("Starting to close worker pool.")
+            self.pool.close()
+            self.pool.join()
+            self.pool = None
+            self.kwargs["pool"] = self.pool
+            logger.info("Finished closing worker pool.")
+
+    def _setup_pool(self):
+        if self.kwargs.get("pool", None) is not None:
+            logger.info("Using user defined pool.")
+            self.pool = self.kwargs["pool"]
+        elif self.npool > 1:
+            logger.info(f"Setting up multiproccesing pool with {self.npool} processes")
+            import multiprocessing
+
+            self.pool = multiprocessing.Pool(
+                processes=self.npool,
+                initializer=_initialize_global_variables,
+                initargs=(
+                    self.likelihood,
+                    self.priors,
+                    self._search_parameter_keys,
+                    self.use_ratio,
+                ),
+            )
+        else:
+            self.pool = None
+        _initialize_global_variables(
+            likelihood=self.likelihood,
+            priors=self.priors,
+            search_parameter_keys=self._search_parameter_keys,
+            use_ratio=self.use_ratio,
+        )
+        self.kwargs["pool"] = self.pool
+
+    def write_current_state(self):
+        raise NotImplementedError()
+
 
 class NestedSampler(Sampler):
     npoints_equiv_kwargs = ['nlive', 'nlives', 'n_live_points', 'npoints',
@@ -659,6 +817,102 @@ class MCMCSampler(Sampler):
         except emcee.autocorr.AutocorrError as e:
             self.result.max_autocorrelation_time = None
             logger.info("Unable to calculate autocorr time: {}".format(e))
+
+
+class _TemporaryFileSampler:
+
+    short_name = ""
+
+    def __init__(self, temporary_directory, **kwargs):
+        super(_TemporaryFileSampler, self).__init__(**kwargs)
+        self.use_temporary_directory = temporary_directory
+        self._outputfiles_basename = None
+        self._temporary_outputfiles_basename = None
+
+    def _check_and_load_sampling_time_file(self):
+        self.time_file_path = self.kwargs["outputfiles_basename"] + '/sampling_time.dat'
+        if os.path.exists(self.time_file_path):
+            with open(self.time_file_path, 'r') as time_file:
+                self.total_sampling_time = float(time_file.readline())
+        else:
+            self.total_sampling_time = 0
+
+    def _calculate_and_save_sampling_time(self):
+        current_time = time.time()
+        new_sampling_time = current_time - self.start_time
+        self.total_sampling_time += new_sampling_time
+
+        with open(self.time_file_path, 'w') as time_file:
+            time_file.write(str(self.total_sampling_time))
+
+        self.start_time = current_time
+
+    def _clean_up_run_directory(self):
+        if self.use_temporary_directory:
+            self._move_temporary_directory_to_proper_path()
+            self.kwargs["outputfiles_basename"] = self.outputfiles_basename
+
+    @property
+    def outputfiles_basename(self):
+        return self._outputfiles_basename
+
+    @outputfiles_basename.setter
+    def outputfiles_basename(self, outputfiles_basename):
+        if outputfiles_basename is None:
+            outputfiles_basename = "{}/{}_{}/".format(self.outdir, self.short_name, self.label)
+        if not outputfiles_basename.endswith("/"):
+            outputfiles_basename += "/"
+        check_directory_exists_and_if_not_mkdir(self.outdir)
+        self._outputfiles_basename = outputfiles_basename
+
+    @property
+    def temporary_outputfiles_basename(self):
+        return self._temporary_outputfiles_basename
+
+    @temporary_outputfiles_basename.setter
+    def temporary_outputfiles_basename(self, temporary_outputfiles_basename):
+        if not temporary_outputfiles_basename.endswith("/"):
+            temporary_outputfiles_basename = "{}/".format(
+                temporary_outputfiles_basename
+            )
+        self._temporary_outputfiles_basename = temporary_outputfiles_basename
+        if os.path.exists(self.outputfiles_basename):
+            shutil.copytree(
+                self.outputfiles_basename, self.temporary_outputfiles_basename
+            )
+
+    def write_current_state_and_exit(self, signum=None, frame=None):
+        """ Write current state and exit on exit_code """
+        self._log_interruption(signum=signum)
+        self._calculate_and_save_sampling_time()
+        if self.use_temporary_directory:
+            self._move_temporary_directory_to_proper_path()
+        os._exit(self.exit_code)
+
+    def _move_temporary_directory_to_proper_path(self):
+        """
+        Move the temporary back to the proper path
+
+        Anything in the proper path at this point is removed including links
+        """
+        self._copy_temporary_directory_contents_to_proper_path()
+        shutil.rmtree(self.temporary_outputfiles_basename)
+
+    def _copy_temporary_directory_contents_to_proper_path(self):
+        """
+        Copy the temporary back to the proper path.
+        Do not delete the temporary directory.
+        """
+        logger.info(
+            "Overwriting {} with {}".format(
+                self.outputfiles_basename, self.temporary_outputfiles_basename
+            )
+        )
+        if self.outputfiles_basename.endswith('/'):
+            outputfiles_basename_stripped = self.outputfiles_basename[:-1]
+        else:
+            outputfiles_basename_stripped = self.outputfiles_basename
+        distutils.dir_util.copy_tree(self.temporary_outputfiles_basename, outputfiles_basename_stripped)
 
 
 class Error(Exception):

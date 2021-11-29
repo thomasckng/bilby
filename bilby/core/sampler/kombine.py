@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 
+from .base_sampler import signal_wrapper
 from .emcee import Emcee
 from ..utils import logger
 
@@ -129,6 +130,7 @@ class Kombine(Emcee):
     def check_resume(self):
         return self.resume and os.path.isfile(self.checkpoint_info.sampler_file)
 
+    @signal_wrapper
     def run_sampler(self):
         if self.autoburnin:
             if self.check_resume():
@@ -150,7 +152,7 @@ class Kombine(Emcee):
                 self.sampler.sample(iterations=iterations, **sampler_function_kwargs),
                 total=iterations):
             self.write_chains_to_file(sample)
-        self.checkpoint()
+        self.write_current_state()
         self.result.sampler_output = np.nan
         if not self.autoburnin:
             tmp_chain = self.sampler.chain.copy()

@@ -1,7 +1,5 @@
 import os
-import signal
 import shutil
-import sys
 from collections import namedtuple
 from shutil import copyfile
 
@@ -9,7 +7,7 @@ import numpy as np
 from pandas import DataFrame
 
 from ..utils import logger, check_directory_exists_and_if_not_mkdir
-from .base_sampler import MCMCSampler, SamplerError
+from .base_sampler import MCMCSampler, SamplerError, signal_wrapper
 
 
 class Zeus(MCMCSampler):
@@ -86,9 +84,6 @@ class Zeus(MCMCSampler):
         self.nburn = nburn
         self.burn_in_fraction = burn_in_fraction
         self.burn_in_act = burn_in_act
-
-        signal.signal(signal.SIGTERM, self.checkpoint_and_exit)
-        signal.signal(signal.SIGINT, self.checkpoint_and_exit)
 
     def _translate_kwargs(self, kwargs):
         if "nwalkers" not in kwargs:
@@ -248,7 +243,7 @@ class Zeus(MCMCSampler):
         nsteps = self._previous_iterations
         return self.sampler.chain[:, :nsteps, :]
 
-    def checkpoint(self):
+    def write_current_state(self):
         """Writes a pickle file of the sampler to disk using dill"""
         import dill
 
@@ -260,11 +255,6 @@ class Zeus(MCMCSampler):
             # to only the completed steps
             self.sampler._chain = self.sampler_chain
             dill.dump(self._sampler, f)
-
-    def checkpoint_and_exit(self, signum, frame):
-        logger.info("Received signal {}".format(signum))
-        self.checkpoint()
-        sys.exit()
 
     def _initialise_sampler(self):
         self._sampler = self.zeus.EnsembleSampler(**self.sampler_init_kwargs)
@@ -351,6 +341,7 @@ class Zeus(MCMCSampler):
     def _set_pos0_for_resume(self):
         self.pos0 = self.sampler.get_last_sample()
 
+    @signal_wrapper
     def run_sampler(self):
         sampler_function_kwargs = self.sampler_function_kwargs
         iterations = sampler_function_kwargs.pop("iterations")
@@ -363,7 +354,7 @@ class Zeus(MCMCSampler):
             iterations=iterations, **sampler_function_kwargs
         ):
             self.write_chains_to_file(sample)
-        self.checkpoint()
+        self.write_current_state()
 
         self.result.sampler_output = np.nan
         self.calculate_autocorrelation(self.sampler.chain.reshape((-1, self.ndim)))

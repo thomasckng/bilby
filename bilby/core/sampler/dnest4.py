@@ -1,16 +1,11 @@
-import os
-import shutil
-import distutils.dir_util
-import signal
 import time
 import datetime
-import sys
 
 import numpy as np
 import pandas as pd
 
-from ..utils import check_directory_exists_and_if_not_mkdir, logger
-from .base_sampler import NestedSampler
+from ..utils import logger
+from .base_sampler import NestedSampler, _TemporaryFileSampler, signal_wrapper
 
 
 class _DNest4Model(object):
@@ -63,7 +58,7 @@ class _DNest4Model(object):
         return (x - minimum) % (maximum - minimum) + minimum
 
 
-class DNest4(NestedSampler):
+class DNest4(_TemporaryFileSampler, NestedSampler):
 
     """
     Bilby wrapper of DNest4
@@ -106,29 +101,25 @@ class DNest4(NestedSampler):
                           beta=100, seed=None, verbose=True, outputfiles_basename=None,
                           backend='memory')
 
+    short_name = "dn4"
+
     def __init__(self, likelihood, priors, outdir="outdir", label="label", use_ratio=False, plot=False,
                  exit_code=77, skip_import_verification=False, temporary_directory=True, **kwargs):
         super(DNest4, self).__init__(
             likelihood=likelihood, priors=priors, outdir=outdir, label=label,
             use_ratio=use_ratio, plot=plot, skip_import_verification=skip_import_verification,
+            temporary_directory=temporary_directory,
             exit_code=exit_code, **kwargs)
 
         self.num_particles = self.kwargs["num_particles"]
         self.max_num_levels = self.kwargs["max_num_levels"]
         self._verbose = self.kwargs["verbose"]
         self._backend = self.kwargs["backend"]
-        self.use_temporary_directory = temporary_directory
 
         self.start_time = np.nan
         self.sampler = None
         self._information = np.nan
         self._last_live_sample_info = np.nan
-        self._outputfiles_basename = None
-        self._temporary_outputfiles_basename = None
-
-        signal.signal(signal.SIGTERM, self.write_current_state_and_exit)
-        signal.signal(signal.SIGINT, self.write_current_state_and_exit)
-        signal.signal(signal.SIGALRM, self.write_current_state_and_exit)
 
         # Get the estimates of the prior distributions' widths and centers.
         widths = []
@@ -169,6 +160,7 @@ class DNest4(NestedSampler):
         dnest4_keys = ["num_steps", "new_level_interval", "lam", "beta", "seed"]
         self.dnest4_kwargs = {key: self.kwargs[key] for key in dnest4_keys}
 
+    @signal_wrapper
     def run_sampler(self):
         import dnest4
 
@@ -216,6 +208,11 @@ class DNest4(NestedSampler):
 
         return self.result
 
+    def write_current_state(self):
+        self._calculate_and_save_sampling_time()
+        if self.use_temporary_directory:
+            self._move_temporary_directory_to_proper_path()
+
     def _translate_kwargs(self, kwargs):
         if 'num_steps' not in kwargs:
             for equiv in self.walks_equiv_kwargs:
@@ -225,92 +222,3 @@ class DNest4(NestedSampler):
     def _verify_kwargs_against_default_kwargs(self):
         self.outputfiles_basename = self.kwargs.pop("outputfiles_basename", None)
         super(DNest4, self)._verify_kwargs_against_default_kwargs()
-
-    def _check_and_load_sampling_time_file(self):
-        self.time_file_path = self.kwargs["outputfiles_basename"] + '/sampling_time.dat'
-        if os.path.exists(self.time_file_path):
-            with open(self.time_file_path, 'r') as time_file:
-                self.total_sampling_time = float(time_file.readline())
-        else:
-            self.total_sampling_time = 0
-
-    def _calculate_and_save_sampling_time(self):
-        current_time = time.time()
-        new_sampling_time = current_time - self.start_time
-        self.total_sampling_time += new_sampling_time
-
-        with open(self.time_file_path, 'w') as time_file:
-            time_file.write(str(self.total_sampling_time))
-
-        self.start_time = current_time
-
-    def _clean_up_run_directory(self):
-        if self.use_temporary_directory:
-            self._move_temporary_directory_to_proper_path()
-            self.kwargs["outputfiles_basename"] = self.outputfiles_basename
-
-    @property
-    def outputfiles_basename(self):
-        return self._outputfiles_basename
-
-    @outputfiles_basename.setter
-    def outputfiles_basename(self, outputfiles_basename):
-        if outputfiles_basename is None:
-            outputfiles_basename = "{}/dnest4{}/".format(self.outdir, self.label)
-        if not outputfiles_basename.endswith("/"):
-            outputfiles_basename += "/"
-        check_directory_exists_and_if_not_mkdir(self.outdir)
-        self._outputfiles_basename = outputfiles_basename
-
-    @property
-    def temporary_outputfiles_basename(self):
-        return self._temporary_outputfiles_basename
-
-    @temporary_outputfiles_basename.setter
-    def temporary_outputfiles_basename(self, temporary_outputfiles_basename):
-        if not temporary_outputfiles_basename.endswith("/"):
-            temporary_outputfiles_basename = "{}/".format(
-                temporary_outputfiles_basename
-            )
-        self._temporary_outputfiles_basename = temporary_outputfiles_basename
-        if os.path.exists(self.outputfiles_basename):
-            shutil.copytree(
-                self.outputfiles_basename, self.temporary_outputfiles_basename
-            )
-
-    def write_current_state_and_exit(self, signum=None, frame=None):
-        """ Write current state and exit on exit_code """
-        logger.info(
-            "Run interrupted by signal {}: checkpoint and exit on {}".format(
-                signum, self.exit_code
-            )
-        )
-        self._calculate_and_save_sampling_time()
-        if self.use_temporary_directory:
-            self._move_temporary_directory_to_proper_path()
-        sys.exit(self.exit_code)
-
-    def _move_temporary_directory_to_proper_path(self):
-        """
-        Move the temporary back to the proper path
-
-        Anything in the proper path at this point is removed including links
-        """
-        self._copy_temporary_directory_contents_to_proper_path()
-        shutil.rmtree(self.temporary_outputfiles_basename)
-
-    def _copy_temporary_directory_contents_to_proper_path(self):
-        """
-        Copy the temporary back to the proper path.
-        Do not delete the temporary directory.
-        """
-        logger.info(
-            "Overwriting {} with {}".format(
-                self.outputfiles_basename, self.temporary_outputfiles_basename
-            )
-        )
-        if self.outputfiles_basename.endswith('/'):
-            outputfiles_basename_stripped = self.outputfiles_basename[:-1]
-        else:
-            outputfiles_basename_stripped = self.outputfiles_basename
-        distutils.dir_util.copy_tree(self.temporary_outputfiles_basename, outputfiles_basename_stripped)

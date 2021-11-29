@@ -1,7 +1,6 @@
 import datetime
 import os
 import sys
-import signal
 import time
 import warnings
 
@@ -15,48 +14,28 @@ from ..utils import (
     safe_file_dump,
     latex_plot_format,
 )
-from .base_sampler import Sampler, NestedSampler
+from .base_sampler import Sampler, NestedSampler, signal_wrapper
 from ..result import rejection_sample
-
-_likelihood = None
-_priors = None
-_search_parameter_keys = None
-_use_ratio = False
-
-
-def _initialize_global_variables(
-        likelihood, priors, search_parameter_keys, use_ratio
-):
-    """
-    Store a global copy of the likelihood, priors, and search keys for
-    multiprocessing.
-    """
-    global _likelihood
-    global _priors
-    global _search_parameter_keys
-    global _use_ratio
-    _likelihood = likelihood
-    _priors = priors
-    _search_parameter_keys = search_parameter_keys
-    _use_ratio = use_ratio
 
 
 def _prior_transform_wrapper(theta):
     """Wrapper to the prior transformation. Needed for multiprocessing."""
-    return _priors.rescale(_search_parameter_keys, theta)
+    from .base_sampler import _sampling_convenience_dump
+    return _sampling_convenience_dump.priors.rescale(_sampling_convenience_dump.search_parameter_keys, theta)
 
 
 def _log_likelihood_wrapper(theta):
     """Wrapper to the log likelihood. Needed for multiprocessing."""
-    if _priors.evaluate_constraints({
-        key: theta[ii] for ii, key in enumerate(_search_parameter_keys)
+    from .base_sampler import _sampling_convenience_dump
+    if _sampling_convenience_dump.priors.evaluate_constraints({
+        key: theta[ii] for ii, key in enumerate(_sampling_convenience_dump.search_parameter_keys)
     }):
-        params = {key: t for key, t in zip(_search_parameter_keys, theta)}
-        _likelihood.parameters.update(params)
-        if _use_ratio:
-            return _likelihood.log_likelihood_ratio()
+        params = {key: t for key, t in zip(_sampling_convenience_dump.search_parameter_keys, theta)}
+        _sampling_convenience_dump.likelihood.parameters.update(params)
+        if _sampling_convenience_dump.use_ratio:
+            return _sampling_convenience_dump.likelihood.log_likelihood_ratio()
         else:
-            return _likelihood.log_likelihood()
+            return _sampling_convenience_dump.likelihood.log_likelihood()
     else:
         return np.nan_to_num(-np.inf)
 
@@ -173,16 +152,6 @@ class Dynesty(NestedSampler):
 
         self.resume_file = '{}/{}_resume.pickle'.format(self.outdir, self.label)
         self.sampling_time = datetime.timedelta()
-
-        try:
-            signal.signal(signal.SIGTERM, self.write_current_state_and_exit)
-            signal.signal(signal.SIGINT, self.write_current_state_and_exit)
-            signal.signal(signal.SIGALRM, self.write_current_state_and_exit)
-        except AttributeError:
-            logger.debug(
-                "Setting signal attributes unavailable on this system. "
-                "This is likely the case if you are running on a Windows machine"
-                " and is no further concern.")
 
     def __getstate__(self):
         """ For pickle: remove external_sampler, which can be an unpicklable "module" """
@@ -313,46 +282,7 @@ class Dynesty(NestedSampler):
         with open(nestcheck_result, 'wb') as file_nest:
             pickle.dump(ns_run, file_nest)
 
-    def _setup_pool(self):
-        if self.kwargs["pool"] is not None:
-            logger.info("Using user defined pool.")
-            self.pool = self.kwargs["pool"]
-        elif self.kwargs["queue_size"] > 1:
-            logger.info(
-                "Setting up multiproccesing pool with {} processes.".format(
-                    self.kwargs["queue_size"]
-                )
-            )
-            import multiprocessing
-            self.pool = multiprocessing.Pool(
-                processes=self.kwargs["queue_size"],
-                initializer=_initialize_global_variables,
-                initargs=(
-                    self.likelihood,
-                    self.priors,
-                    self._search_parameter_keys,
-                    self.use_ratio
-                )
-            )
-        else:
-            _initialize_global_variables(
-                likelihood=self.likelihood,
-                priors=self.priors,
-                search_parameter_keys=self._search_parameter_keys,
-                use_ratio=self.use_ratio
-            )
-            self.pool = None
-        self.kwargs["pool"] = self.pool
-
-    def _close_pool(self):
-        if getattr(self, "pool", None) is not None:
-            logger.info("Starting to close worker pool.")
-            self.pool.close()
-            self.pool.join()
-            self.pool = None
-            self.kwargs["pool"] = self.pool
-            logger.info("Finished closing worker pool.")
-
+    @signal_wrapper
     def run_sampler(self):
         import dynesty
         import dill
@@ -578,22 +508,8 @@ class Dynesty(NestedSampler):
             return False
 
     def write_current_state_and_exit(self, signum=None, frame=None):
-        """
-        Make sure that if a pool of jobs is running only the parent tries to
-        checkpoint and exit. Only the parent has a 'pool' attribute.
-        """
-        if self.kwargs["queue_size"] == 1 or getattr(self, "pool", None) is not None:
-            if signum == 14:
-                logger.info(
-                    "Run interrupted by alarm signal {}: checkpoint and exit on {}"
-                    .format(signum, self.exit_code))
-            else:
-                logger.info(
-                    "Run interrupted by signal {}: checkpoint and exit on {}"
-                    .format(signum, self.exit_code))
-            self.write_current_state()
-            self._close_pool()
-            os._exit(self.exit_code)
+        self.pbar.close()
+        super(Dynesty, self).write_current_state_and_exit(signum=signum, frame=frame)
 
     def write_current_state(self):
         """

@@ -1,11 +1,10 @@
 
 import os
-import signal
 
 import numpy as np
 
 from ..utils import logger, check_directory_exists_and_if_not_mkdir
-from .base_sampler import Sampler
+from .base_sampler import Sampler, signal_wrapper
 from .dynesty import Dynesty
 
 
@@ -103,9 +102,6 @@ class DynamicDynesty(Dynesty):
 
         self.resume_file = '{}/{}_resume.pickle'.format(self.outdir, self.label)
 
-        signal.signal(signal.SIGTERM, self.write_current_state_and_exit)
-        signal.signal(signal.SIGINT, self.write_current_state_and_exit)
-
     @property
     def external_sampler_name(self):
         return 'dynesty'
@@ -119,6 +115,7 @@ class DynamicDynesty(Dynesty):
                 'save_bounds', 'print_progress', 'print_func', 'live_points']
         return {key: self.kwargs[key] for key in keys}
 
+    @signal_wrapper
     def run_sampler(self):
         import dynesty
         self.sampler = dynesty.DynamicNestedSampler(
