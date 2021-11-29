@@ -415,12 +415,11 @@ class Ptemcee(MCMCSampler):
                     dim=self.ndim,
                     logl=do_nothing_function,
                     logp=do_nothing_function,
-                    pool=self.pool,
                     threads=self.threads,
                     **self.sampler_init_kwargs
                 )
 
-                self.sampler._likeprior = LikePriorEvaluator()
+            self.sampler._likeprior = LikePriorEvaluator()
 
             # Initialize storing results
             self.iteration = 0
@@ -1181,6 +1180,10 @@ class LikePriorEvaluator(object):
         search_parameter_keys = _sampling_convenience_dump.search_parameter_keys
         params = {key: t for key, t in zip(search_parameter_keys, v_array)}
         return priors.ln_prob(params)
+
+    def call_emcee(self, theta):
+        ll, lp = self.__call__(theta)
+        return ll + lp, [ll, lp]
 
     def __call__(self, x):
         lp = self.logp(x)

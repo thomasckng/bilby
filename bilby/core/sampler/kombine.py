@@ -4,7 +4,10 @@ import numpy as np
 
 from .base_sampler import signal_wrapper
 from .emcee import Emcee
+from .ptemcee import LikePriorEvaluator
 from ..utils import logger
+
+_evaluator = LikePriorEvaluator()
 
 
 class Kombine(Emcee):
@@ -58,24 +61,6 @@ class Kombine(Emcee):
         # set prerelease to False to prevent checks for newer emcee versions in parent class
         self.prerelease = False
 
-    def _translate_kwargs(self, kwargs):
-        if 'nwalkers' not in kwargs:
-            for equiv in self.nwalkers_equiv_kwargs:
-                if equiv in kwargs:
-                    kwargs['nwalkers'] = kwargs.pop(equiv)
-        if 'iterations' not in kwargs:
-            if 'nsteps' in kwargs:
-                kwargs['iterations'] = kwargs.pop('nsteps')
-        # make sure processes kwarg is 1
-        if 'processes' in kwargs:
-            if kwargs['processes'] != 1:
-                logger.warning("The 'processes' argument cannot be used for "
-                               "parallelisation. This run will proceed "
-                               "without parallelisation, but consider the use "
-                               "of an appropriate Pool object passed to the "
-                               "'pool' keyword.")
-                kwargs['processes'] = 1
-
     @property
     def sampler_function_kwargs(self):
         keys = ['lnpost0', 'blob0', 'iterations', 'storechain', 'lnprop0', 'update_interval', 'kde',
@@ -105,11 +90,9 @@ class Kombine(Emcee):
                        for key, value in self.kwargs.items()
                        if key not in self.sampler_function_kwargs and key not in self.sampler_burnin_kwargs}
         init_kwargs.pop("burnin_verbose")
-        init_kwargs['lnpostfn'] = self.lnpostfn
+        init_kwargs['lnpostfn'] = _evaluator.call_emcee
         init_kwargs['ndim'] = self.ndim
 
-        # have to make sure pool is None so sampler will be pickleable
-        init_kwargs['pool'] = None
         return init_kwargs
 
     def _initialise_sampler(self):
@@ -132,6 +115,7 @@ class Kombine(Emcee):
 
     @signal_wrapper
     def run_sampler(self):
+        self._setup_pool()
         if self.autoburnin:
             if self.check_resume():
                 logger.info("Resuming with autoburnin=True skips burnin process:")
@@ -158,6 +142,7 @@ class Kombine(Emcee):
             tmp_chain = self.sampler.chain.copy()
             self.calculate_autocorrelation(tmp_chain.reshape((-1, self.ndim)))
             self.print_nburn_logging_info()
+        self._close_pool()
 
         self._generate_result()
         self.result.log_evidence_err = np.nan
@@ -166,3 +151,15 @@ class Kombine(Emcee):
         self.result.samples = tmp_chain.reshape((-1, self.ndim))
         self.result.walkers = self.sampler.chain.reshape((self.nwalkers, self.nsteps, self.ndim))
         return self.result
+
+    def _setup_pool(self):
+        from schwimmbad import SerialPool
+        super(Kombine, self)._setup_pool()
+        if self.pool is None:
+            self.pool = SerialPool()
+
+    def _close_pool(self):
+        from schwimmbad import SerialPool
+        if isinstance(self.pool, SerialPool):
+            self.pool = None
+        super(Kombine, self)._close_pool()
