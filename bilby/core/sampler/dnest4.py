@@ -208,11 +208,6 @@ class DNest4(_TemporaryFileSampler, NestedSampler):
 
         return self.result
 
-    def write_current_state(self):
-        self._calculate_and_save_sampling_time()
-        if self.use_temporary_directory:
-            self._move_temporary_directory_to_proper_path()
-
     def _translate_kwargs(self, kwargs):
         if 'num_steps' not in kwargs:
             for equiv in self.walks_equiv_kwargs:

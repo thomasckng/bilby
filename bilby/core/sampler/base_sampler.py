@@ -887,13 +887,10 @@ class _TemporaryFileSampler:
                 self.outputfiles_basename, self.temporary_outputfiles_basename
             )
 
-    def write_current_state_and_exit(self, signum=None, frame=None):
-        """ Write current state and exit on exit_code """
-        self._log_interruption(signum=signum)
+    def write_current_state(self):
         self._calculate_and_save_sampling_time()
         if self.use_temporary_directory:
             self._move_temporary_directory_to_proper_path()
-        os._exit(self.exit_code)
 
     def _move_temporary_directory_to_proper_path(self):
         """
