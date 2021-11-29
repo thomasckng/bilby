@@ -1066,18 +1066,19 @@ class BilbyMCMCSampler(object):
         use_ratio=False,
     ):
         from ..core.sampler.base_sampler import _sampling_convenience_dump
-        self._stuff = _sampling_convenience_dump
+        self._sampling_helper = _sampling_convenience_dump
         self.beta = beta
         self.Tindex = Tindex
         self.Eindex = Eindex
         self.use_ratio = use_ratio
 
-        self.parameters = self._stuff.priors.non_fixed_keys
+        self.parameters = self._sampling_helper.priors.non_fixed_keys
         self.ndim = len(self.parameters)
 
-        full_sample_dict = self._stuff.priors.sample()
+        full_sample_dict = self._sampling_helper.priors.sample()
         initial_sample = {
-            k: v for k, v in full_sample_dict.items() if k in self._stuff.priors.non_fixed_keys
+            k: v for k, v in full_sample_dict.items()
+            if k in self._sampling_helper.priors.non_fixed_keys
         }
         initial_sample = Sample(initial_sample)
         initial_sample[LOGLKEY] = self.log_likelihood(initial_sample)
@@ -1100,7 +1101,7 @@ class BilbyMCMCSampler(object):
                 warn = False
 
             self.proposal_cycle = proposals.get_proposal_cycle(
-                proposal_cycle, self._stuff.priors, L1steps=self.chain.L1steps, warn=warn
+                proposal_cycle, self._sampling_helper.priors, L1steps=self.chain.L1steps, warn=warn
             )
         elif isinstance(proposal_cycle, proposals.ProposalCycle):
             self.proposal_cycle = proposal_cycle
@@ -1117,17 +1118,17 @@ class BilbyMCMCSampler(object):
         self.stop_after_convergence = convergence_inputs.stop_after_convergence
 
     def log_likelihood(self, sample):
-        self._stuff.likelihood.parameters.update(sample.sample_dict)
+        self._sampling_helper.likelihood.parameters.update(sample.sample_dict)
 
         if self.use_ratio:
-            logl = self._stuff.likelihood.log_likelihood_ratio()
+            logl = self._sampling_helper.likelihood.log_likelihood_ratio()
         else:
-            logl = self._stuff.likelihood.log_likelihood()
+            logl = self._sampling_helper.likelihood.log_likelihood()
 
         return logl
 
     def log_prior(self, sample):
-        return self._stuff.priors.ln_prob(sample.parameter_only_dict)
+        return self._sampling_helper.priors.ln_prob(sample.parameter_only_dict)
 
     def accept_proposal(self, prop, proposal):
         self.chain.append(prop)
@@ -1225,8 +1226,8 @@ class BilbyMCMCSampler(object):
         zerotemp_logl = hot_samples[LOGLKEY]
 
         # Revert to true likelihood if needed
-        if self._stuff.use_ratio:
-            zerotemp_logl += self._stuff.likelihood.noise_log_likelihood()
+        if self._sampling_helper.use_ratio:
+            zerotemp_logl += self._sampling_helper.likelihood.noise_log_likelihood()
 
         # Calculate normalised weights
         log_weights = (1 - beta) * zerotemp_logl
