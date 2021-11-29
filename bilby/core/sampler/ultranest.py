@@ -96,6 +96,7 @@ class Ultranest(_TemporaryFileSampler, NestedSampler):
             temporary_directory=temporary_directory,
             **kwargs,
         )
+        self._apply_ultranest_boundaries()
 
         if self.use_temporary_directory:
             # set callback interval, so copying of results does not thrash the
@@ -126,6 +127,19 @@ class Ultranest(_TemporaryFileSampler, NestedSampler):
                 self._copy_temporary_directory_contents_to_proper_path()
                 self._calculate_and_save_sampling_time()
             self._viz_callback_counter += 1
+
+    def _apply_ultranest_boundaries(self):
+        if (
+                self.kwargs["wrapped_params"] is None
+                or len(self.kwargs.get("wrapped_params", [])) == 0
+        ):
+            self.kwargs["wrapped_params"] = []
+            for param, value in self.priors.items():
+                if param in self.search_parameter_keys:
+                    if value.boundary == "periodic":
+                        self.kwargs["wrapped_params"].append(1)
+                    else:
+                        self.kwargs["wrapped_params"].append(0)
 
     def _copy_temporary_directory_contents_to_proper_path(self):
         """
