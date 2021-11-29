@@ -495,7 +495,7 @@ class Dynesty(NestedSampler):
                         ))
                 del sampler.versions
                 self.sampler = sampler
-                if self.sampler.added_live and continuing:
+                if getattr(self.sampler, "added_live", False) and continuing:
                     self.sampler._remove_live_points()
                 self.sampler.nqueue = -1
                 self.sampler.rstate = np.random

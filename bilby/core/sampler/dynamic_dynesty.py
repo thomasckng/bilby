@@ -1,11 +1,10 @@
-
-import os
+import datetime
 
 import numpy as np
 
-from ..utils import logger, check_directory_exists_and_if_not_mkdir
+from ..utils import logger
 from .base_sampler import Sampler, signal_wrapper
-from .dynesty import Dynesty
+from .dynesty import Dynesty, _log_likelihood_wrapper, _prior_transform_wrapper
 
 
 class DynamicDynesty(Dynesty):
@@ -108,25 +107,29 @@ class DynamicDynesty(Dynesty):
 
     @property
     def sampler_function_kwargs(self):
-        keys = ['nlive_init', 'maxiter_init', 'maxcall_init', 'dlogz_init',
-                'logl_max_init', 'nlive_batch', 'wt_function', 'wt_kwargs',
-                'maxiter_batch', 'maxcall_batch', 'maxiter', 'maxcall',
-                'maxbatch', 'stop_function', 'stop_kwargs', 'use_stop',
-                'save_bounds', 'print_progress', 'print_func', 'live_points']
+        keys = [
+            'nlive_init', 'maxiter_init', 'maxcall_init', 'dlogz_init',
+            'logl_max_init', 'nlive_batch', 'wt_function', 'wt_kwargs',
+            'maxiter_batch', 'maxcall_batch', 'maxiter', 'maxcall',
+            'maxbatch', 'stop_function', 'stop_kwargs', 'use_stop',
+            'save_bounds', 'print_progress', 'print_func', 'live_points',
+        ]
         return {key: self.kwargs[key] for key in keys}
 
     @signal_wrapper
     def run_sampler(self):
         import dynesty
+        self._setup_pool()
         self.sampler = dynesty.DynamicNestedSampler(
-            loglikelihood=self.log_likelihood,
-            prior_transform=self.prior_transform,
+            loglikelihood=_log_likelihood_wrapper,
+            prior_transform=_prior_transform_wrapper,
             ndim=self.ndim, **self.sampler_init_kwargs)
 
         if self.check_point:
             out = self._run_external_sampler_with_checkpointing()
         else:
             out = self._run_external_sampler_without_checkpointing()
+        self._close_pool()
 
         # Flushes the output to force a line break
         if self.kwargs["verbose"]:
@@ -149,6 +152,7 @@ class DynamicDynesty(Dynesty):
         old_ncall = self.sampler.ncall
         sampler_kwargs = self.sampler_function_kwargs.copy()
         sampler_kwargs['maxcall'] = self.n_check_point
+        self.start_time = datetime.datetime.now()
         while True:
             sampler_kwargs['maxcall'] += self.n_check_point
             self.sampler.run_nested(**sampler_kwargs)
@@ -161,27 +165,8 @@ class DynamicDynesty(Dynesty):
         self._remove_checkpoint()
         return self.sampler.results
 
-    def write_current_state(self):
-        """
-        """
-        import dill
-        check_directory_exists_and_if_not_mkdir(self.outdir)
-        with open(self.resume_file, 'wb') as file:
-            dill.dump(self, file)
-
-    def read_saved_state(self, continuing=False):
-        """
-        """
-        import dill
-
-        logger.debug("Reading resume file {}".format(self.resume_file))
-        if os.path.isfile(self.resume_file):
-            with open(self.resume_file, 'rb') as file:
-                self = dill.load(file)
-        else:
-            logger.debug(
-                "Failed to read resume file {}".format(self.resume_file))
-            return False
+    def write_current_state_and_exit(self, signum=None, frame=None):
+        Sampler.write_current_state_and_exit(self=self, signum=signum, frame=frame)
 
     def _verify_kwargs_against_default_kwargs(self):
         Sampler._verify_kwargs_against_default_kwargs(self)

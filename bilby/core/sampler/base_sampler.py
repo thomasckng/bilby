@@ -185,6 +185,7 @@ class Sampler(object):
             use_ratio=False, plot=False, skip_import_verification=False,
             injection_parameters=None, meta_data=None, result_class=None,
             likelihood_benchmark=False, soft_init=False, exit_code=130,
+            npool=1,
             **kwargs):
         self.likelihood = likelihood
         if isinstance(priors, PriorDict):
@@ -196,6 +197,7 @@ class Sampler(object):
         self.injection_parameters = injection_parameters
         self.meta_data = meta_data
         self.use_ratio = use_ratio
+        self._npool = npool
         if not skip_import_verification:
             self._verify_external_sampler()
         self.external_sampler_function = None
@@ -268,7 +270,7 @@ class Sampler(object):
     def _verify_external_sampler(self):
         external_sampler_name = self.external_sampler_name
         try:
-            self.external_sampler = __import__(external_sampler_name)
+            __import__(external_sampler_name)
         except (ImportError, SystemExit):
             raise SamplerNotInstalledError(
                 "Sampler {} is not installed on this system".format(external_sampler_name))
@@ -638,7 +640,7 @@ class Sampler(object):
         for key in self.npool_equiv_kwargs:
             if key in self.kwargs:
                 return self.kwargs[key]
-        return 1
+        return self._npool
 
     def _log_interruption(self, signum=None):
         if signum == 14:
@@ -676,7 +678,7 @@ class Sampler(object):
         if self.kwargs.get("pool", None) is not None:
             logger.info("Using user defined pool.")
             self.pool = self.kwargs["pool"]
-        elif self.npool > 1:
+        elif self.npool is not None and self.npool > 1:
             logger.info(f"Setting up multiproccesing pool with {self.npool} processes")
             import multiprocessing
 
