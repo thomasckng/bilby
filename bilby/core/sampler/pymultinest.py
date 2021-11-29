@@ -76,6 +76,12 @@ class Pymultinest(_TemporaryFileSampler, NestedSampler):
         temporary_directory=True,
         **kwargs
     ):
+        try:
+            from mpi4py import MPI
+
+            using_mpi = MPI.COMM_WORLD.Get_size() > 1
+        except ImportError:
+            using_mpi = False
         super(Pymultinest, self).__init__(
             likelihood=likelihood,
             priors=priors,
@@ -90,7 +96,6 @@ class Pymultinest(_TemporaryFileSampler, NestedSampler):
         )
         self._apply_multinest_boundaries()
         self.exit_code = exit_code
-        using_mpi = len([key for key in os.environ if "MPI" in key])
         if using_mpi and temporary_directory:
             logger.info(
                 "Temporary directory incompatible with MPI, "
@@ -105,15 +110,15 @@ class Pymultinest(_TemporaryFileSampler, NestedSampler):
                     kwargs["n_live_points"] = kwargs.pop(equiv)
 
     def _verify_kwargs_against_default_kwargs(self):
-        """ Check the kwargs """
+        """Check the kwargs"""
 
         self.outputfiles_basename = self.kwargs.pop("outputfiles_basename", None)
 
         # for PyMultiNest >=2.9 the n_params kwarg cannot be None
         if self.kwargs["n_params"] is None:
             self.kwargs["n_params"] = self.ndim
-        if self.kwargs['dump_callback'] is None:
-            self.kwargs['dump_callback'] = self._dump_callback
+        if self.kwargs["dump_callback"] is None:
+            self.kwargs["dump_callback"] = self._dump_callback
         NestedSampler._verify_kwargs_against_default_kwargs(self)
 
     def _dump_callback(self, *args, **kwargs):
@@ -179,21 +184,18 @@ class Pymultinest(_TemporaryFileSampler, NestedSampler):
         estimate of `remaining_prior_volume / N`.
         """
         import pandas as pd
+
         dir_ = self.kwargs["outputfiles_basename"]
         dead_points = np.genfromtxt(dir_ + "/ev.dat")
         live_points = np.genfromtxt(dir_ + "/phys_live.points")
 
         nlive = self.kwargs["n_live_points"]
-        final_log_prior_volume = - len(dead_points) / nlive - np.log(nlive)
+        final_log_prior_volume = -len(dead_points) / nlive - np.log(nlive)
         live_points = np.insert(live_points, -1, final_log_prior_volume, axis=-1)
 
         nested_samples = pd.DataFrame(
             np.vstack([dead_points, live_points]).copy(),
-            columns=self.search_parameter_keys + ["log_likelihood", "log_prior_volume", "mode"]
+            columns=self.search_parameter_keys
+            + ["log_likelihood", "log_prior_volume", "mode"],
         )
         return nested_samples
-
-    def write_current_state(self):
-        self._calculate_and_save_sampling_time()
-        if self.use_temporary_directory:
-            self._copy_temporary_directory_contents_to_proper_path()
