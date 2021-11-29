@@ -6,12 +6,17 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
+from ..core.result import rejection_sample
+from ..core.sampler.base_sampler import (
+    MCMCSampler,
+    ResumeError,
+    SamplerError,
+    signal_wrapper,
+)
+from ..core.utils import check_directory_exists_and_if_not_mkdir, logger, safe_file_dump
 from . import proposals
 from .chain import Chain, Sample
 from .utils import LOGLKEY, LOGPKEY, ConvergenceInputs, ParallelTemperingInputs
-from ..core.result import rejection_sample
-from ..core.sampler.base_sampler import MCMCSampler, ResumeError, SamplerError, signal_wrapper
-from ..core.utils import check_directory_exists_and_if_not_mkdir, logger, safe_file_dump
 
 
 class Bilby_MCMC(MCMCSampler):
@@ -1066,6 +1071,7 @@ class BilbyMCMCSampler(object):
         use_ratio=False,
     ):
         from ..core.sampler.base_sampler import _sampling_convenience_dump
+
         self._sampling_helper = _sampling_convenience_dump
         self.beta = beta
         self.Tindex = Tindex
@@ -1077,7 +1083,8 @@ class BilbyMCMCSampler(object):
 
         full_sample_dict = self._sampling_helper.priors.sample()
         initial_sample = {
-            k: v for k, v in full_sample_dict.items()
+            k: v
+            for k, v in full_sample_dict.items()
             if k in self._sampling_helper.priors.non_fixed_keys
         }
         initial_sample = Sample(initial_sample)
@@ -1101,7 +1108,10 @@ class BilbyMCMCSampler(object):
                 warn = False
 
             self.proposal_cycle = proposals.get_proposal_cycle(
-                proposal_cycle, self._sampling_helper.priors, L1steps=self.chain.L1steps, warn=warn
+                proposal_cycle,
+                self._sampling_helper.priors,
+                L1steps=self.chain.L1steps,
+                warn=warn,
             )
         elif isinstance(proposal_cycle, proposals.ProposalCycle):
             self.proposal_cycle = proposal_cycle

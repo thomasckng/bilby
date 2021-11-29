@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from ..utils import logger, check_directory_exists_and_if_not_mkdir
-from .base_sampler import SamplerError, MCMCSampler, signal_wrapper, _sampling_convenience_dump, _initialize_global_variables
+from .base_sampler import SamplerError, MCMCSampler, signal_wrapper, _sampling_convenience_dump
 
 
 ConvergenceInputs = namedtuple(
