@@ -73,7 +73,7 @@ class PTMCMCSampler(MCMCSampler):
         # which forces `__name__.lower()
         external_sampler_name = self.__class__.__name__
         try:
-            self.external_sampler = __import__(external_sampler_name)
+            __import__(external_sampler_name)
         except (ImportError, SystemExit):
             raise SamplerNotInstalledError(
                 "Sampler {} is not installed on this system".format(external_sampler_name))
