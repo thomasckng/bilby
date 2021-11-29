@@ -36,9 +36,9 @@ class TestRunningSamplers(unittest.TestCase):
         bilby.core.utils.command_line_args.bilby_test_mode = False
         shutil.rmtree("outdir")
 
-    def _run_sampler(self, sampler, **kwargs):
+    def _run_sampler(self, sampler, max_pool=2, **kwargs):
         kwargs["resume"] = kwargs.get("resume", False)
-        for npool in [1, 2]:
+        for npool in range(1, max_pool):
             _ = bilby.run_sampler(
                 likelihood=self.likelihood,
                 priors=self.priors,
@@ -60,6 +60,7 @@ class TestRunningSamplers(unittest.TestCase):
             num_per_step=10,
             thread_steps=1,
             num_particles=50,
+            max_pool=1,
         )
 
     def test_run_dynesty(self):
@@ -88,7 +89,7 @@ class TestRunningSamplers(unittest.TestCase):
         )
 
     def test_run_nestle(self):
-        self._run_sampler(sampler="nestle", nlive=100)
+        self._run_sampler(sampler="nestle", nlive=100, max_pool=1)
 
     def test_run_nessai(self):
         self._run_sampler(
@@ -122,7 +123,7 @@ class TestRunningSamplers(unittest.TestCase):
         )
 
     def test_run_pymultinest(self):
-        self._run_sampler(sampler="pymultinest", nlive=100)
+        self._run_sampler(sampler="pymultinest", nlive=100, max_pool=1)
 
     def test_run_PTMCMCSampler(self):
         self._run_sampler(
