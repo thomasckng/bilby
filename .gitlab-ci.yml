@@ -266,8 +266,8 @@ build-python37-container:
   stage: initial
   image: docker:19.03.12
   needs: ["containers"]
-  only:
-    - schedules
+#  only:
+#    - schedules
   script:
     - cd containers
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
