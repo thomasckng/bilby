@@ -114,6 +114,11 @@ class Zeus(Emcee):
 
         return init_kwargs
 
+    def write_current_state(self):
+        self._sampler.distribute = map
+        super(Zeus, self).write_current_state()
+        self._sampler.distribute = getattr(self._sampler.pool, "map", map)
+
     def _initialise_sampler(self):
         from zeus import EnsembleSampler
         self._sampler = EnsembleSampler(**self.sampler_init_kwargs)
