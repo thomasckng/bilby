@@ -1,13 +1,57 @@
 import multiprocessing
+import os
+import threading
+import time
+from signal import SIGINT
+
 multiprocessing.set_start_method("fork")  # noqa
 
 import unittest
-import pytest
+from parameterized import parameterized
 import shutil
-import sys
 
 import bilby
 import numpy as np
+
+
+_sampler_kwargs = dict(
+    bilby_mcmc=dict(nsamples=200, printdt=1),
+    cpnest=dict(nlive=100),
+    dnest4=dict(
+        max_num_levels=2,
+        num_steps=10,
+        new_level_interval=10,
+        num_per_step=10,
+        thread_steps=1,
+        num_particles=50,
+        max_pool=1,
+    ),
+    dynesty=dict(nlive=100),
+    dynamic_dynesty=dict(
+        nlive_init=100,
+        nlive_batch=100,
+        dlogz_init=1.0,
+        maxbatch=0,
+        maxcall=100,
+        bound="single",
+    ),
+    emcee=dict(iterations=1000, nwalkers=10),
+    kombine=dict(iterations=2000, nwalkers=20, autoburnin=False),
+    nessai=dict(nlive=100, poolsize=1000, max_iteration=1000),
+    nestle=dict(nlive=100),
+    ptemcee=dict(
+        nsamples=100,
+        nwalkers=50,
+        burn_in_act=1,
+        ntemps=1,
+        frac_threshold=0.5,
+    ),
+    PTMCMCsampler=dict(Niter=101, burn=2, isave=100),
+    pymc3=dict(draws=50, tune=50, n_init=250),
+    pymultinest=dict(nlive=100),
+    pypolychord=dict(nlive=100),
+    ultranest=dict(nlive=100, resume="overwrite", temporary_directory=False),
+)
 
 
 class TestRunningSamplers(unittest.TestCase):
@@ -36,112 +80,52 @@ class TestRunningSamplers(unittest.TestCase):
         bilby.core.utils.command_line_args.bilby_test_mode = False
         shutil.rmtree("outdir")
 
-    def _run_sampler(self, sampler, max_pool=2, **kwargs):
+    @parameterized.expand(_sampler_kwargs.keys())
+    def test_run_sampler_single(self, sampler):
+        self._run_sampler(sampler, pool_size=1)
+
+    @parameterized.expand(_sampler_kwargs.keys())
+    def test_run_sampler_pool(self, sampler):
+        self._run_sampler(sampler, pool_size=1)
+
+    def _run_sampler(self, sampler, pool_size, **extra_kwargs):
+        bilby.core.utils.check_directory_exists_and_if_not_mkdir("outdir")
+        kwargs = _sampler_kwargs[sampler]
         kwargs["resume"] = kwargs.get("resume", False)
-        for npool in range(1, max_pool):
-            _ = bilby.run_sampler(
-                likelihood=self.likelihood,
-                priors=self.priors,
-                sampler=sampler,
-                save=False,
-                npool=npool,
-                **kwargs,
-            )
-
-    def test_run_cpnest(self):
-        self._run_sampler(sampler="cpnest", nlive=100)
-
-    def test_run_dnest4(self):
-        self._run_sampler(
-            sampler="dnest4",
-            max_num_levels=2,
-            num_steps=10,
-            new_level_interval=10,
-            num_per_step=10,
-            thread_steps=1,
-            num_particles=50,
-            max_pool=1,
+        _ = bilby.run_sampler(
+            likelihood=self.likelihood,
+            priors=self.priors,
+            sampler=sampler,
+            save=True,
+            npool=pool_size,
+            **kwargs,
+            **extra_kwargs,
         )
 
-    def test_run_dynesty(self):
-        self._run_sampler(sampler="dynesty", nlive=100)
+    @parameterized.expand(_sampler_kwargs.keys())
+    def test_interrupt_sampler_single(self, sampler):
+        self._run_sampler(sampler, pool_size=1)
 
-    def test_run_dynamic_dynesty(self):
-        self._run_sampler(
-            sampler="dynamic_dynesty",
-            nlive_init=100,
-            nlive_batch=100,
-            dlogz_init=1.0,
-            maxbatch=0,
-            maxcall=100,
-            bound="single",
-        )
+    @parameterized.expand(_sampler_kwargs.keys())
+    def test_interrupt_sampler_pool(self, sampler):
+        self._run_sampler(sampler, pool_size=1)
 
-    def test_run_emcee(self):
-        self._run_sampler(sampler="emcee", iterations=1000, nwalkers=10)
+    def _run_with_signal_handling(self, sampler, pool_size=1):
+        pid = os.getpid()
 
-    def test_run_kombine(self):
-        self._run_sampler(
-            sampler="kombine",
-            iterations=2000,
-            nwalkers=20,
-            autoburnin=False,
-        )
+        def trigger_signal():
+            # You could do something more robust, e.g. wait until port is listening
+            time.sleep(1)
+            os.kill(pid, SIGINT)
 
-    def test_run_nestle(self):
-        self._run_sampler(sampler="nestle", nlive=100, max_pool=1)
+        thread = threading.Thread(target=trigger_signal)
+        thread.daemon = True
+        thread.start()
 
-    def test_run_nessai(self):
-        self._run_sampler(
-            sampler="nessai",
-            nlive=100,
-            poolsize=1000,
-            max_iteration=1000,
-        )
-
-    def test_run_pypolychord(self):
-        pytest.importorskip("pypolychord")
-        self._run_sampler(sampler="pypolychord", nlive=100)
-
-    def test_run_ptemcee(self):
-        self._run_sampler(
-            sampler="ptemcee",
-            nsamples=100,
-            nwalkers=50,
-            burn_in_act=1,
-            ntemps=1,
-            frac_threshold=0.5,
-        )
-
-    @pytest.mark.skipif(sys.version_info[1] <= 6, reason="pymc3 is broken in py36")
-    def test_run_pymc3(self):
-        self._run_sampler(
-            sampler="pymc3",
-            draws=50,
-            tune=50,
-            n_init=250,
-        )
-
-    def test_run_pymultinest(self):
-        self._run_sampler(sampler="pymultinest", nlive=100, max_pool=1)
-
-    def test_run_PTMCMCSampler(self):
-        self._run_sampler(
-            sampler="PTMCMCsampler",
-            Niter=101,
-            burn=2,
-            isave=100,
-        )
-
-    def test_run_ultranest(self):
-        # run using NestedSampler (with nlive specified)
-        self._run_sampler(sampler="ultranest", nlive=100, resume="overwrite")
-
-        # run using ReactiveNestedSampler (with no nlive given)
-        self._run_sampler(sampler='ultranest', resume="overwrite")
-
-    def test_run_bilby_mcmc(self):
-        self._run_sampler(sampler="bilby_mcmc", nsamples=200, printdt=1)
+        try:
+            self._run_sampler(sampler=sampler, pool_size=pool_size, checkpoint_exit_code=5)
+        except SystemExit as error:
+            self.assertEqual(error.code, 5)
 
 
 if __name__ == "__main__":

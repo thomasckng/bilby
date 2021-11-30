@@ -247,7 +247,6 @@ class Ultranest(_TemporaryFileSampler, NestedSampler):
         results = sampler.run(**self.sampler_function_kwargs)
         self._calculate_and_save_sampling_time()
 
-        # Clean up
         self._clean_up_run_directory()
 
         self._generate_result(results)

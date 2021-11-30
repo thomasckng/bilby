@@ -768,27 +768,6 @@ class NestedSampler(Sampler):
         else:
             return np.nan_to_num(-np.inf)
 
-    def _setup_run_directory(self):
-        """
-        If using a temporary directory, the output directory is moved to the
-        temporary directory.
-        Used for Dnest4, Pymultinest, and Ultranest.
-        """
-        if self.use_temporary_directory:
-            temporary_outputfiles_basename = tempfile.TemporaryDirectory().name
-            self.temporary_outputfiles_basename = temporary_outputfiles_basename
-
-            if os.path.exists(self.outputfiles_basename):
-                distutils.dir_util.copy_tree(self.outputfiles_basename, self.temporary_outputfiles_basename)
-            check_directory_exists_and_if_not_mkdir(temporary_outputfiles_basename)
-
-            self.kwargs["outputfiles_basename"] = self.temporary_outputfiles_basename
-            logger.info("Using temporary file {}".format(temporary_outputfiles_basename))
-        else:
-            check_directory_exists_and_if_not_mkdir(self.outputfiles_basename)
-            self.kwargs["outputfiles_basename"] = self.outputfiles_basename
-            logger.info("Using output file {}".format(self.outputfiles_basename))
-
 
 class MCMCSampler(Sampler):
     nwalkers_equiv_kwargs = ['nwalker', 'nwalkers', 'draws', 'Niter']
@@ -838,7 +817,6 @@ class _TemporaryFileSampler:
         self._temporary_outputfiles_basename = None
 
     def _check_and_load_sampling_time_file(self):
-        self.time_file_path = self.kwargs["outputfiles_basename"] + '/sampling_time.dat'
         if os.path.exists(self.time_file_path):
             with open(self.time_file_path, 'r') as time_file:
                 self.total_sampling_time = float(time_file.readline())
@@ -880,9 +858,7 @@ class _TemporaryFileSampler:
     @temporary_outputfiles_basename.setter
     def temporary_outputfiles_basename(self, temporary_outputfiles_basename):
         if not temporary_outputfiles_basename.endswith("/"):
-            temporary_outputfiles_basename = "{}/".format(
-                temporary_outputfiles_basename
-            )
+            temporary_outputfiles_basename += "/"
         self._temporary_outputfiles_basename = temporary_outputfiles_basename
         if os.path.exists(self.outputfiles_basename):
             shutil.copytree(
@@ -913,11 +889,30 @@ class _TemporaryFileSampler:
                 self.outputfiles_basename, self.temporary_outputfiles_basename
             )
         )
-        if self.outputfiles_basename.endswith('/'):
-            outputfiles_basename_stripped = self.outputfiles_basename[:-1]
-        else:
-            outputfiles_basename_stripped = self.outputfiles_basename
+        outputfiles_basename_stripped = self.outputfiles_basename.rstrip("/")
         distutils.dir_util.copy_tree(self.temporary_outputfiles_basename, outputfiles_basename_stripped)
+
+    def _setup_run_directory(self):
+        """
+        If using a temporary directory, the output directory is moved to the
+        temporary directory.
+        Used for Dnest4, Pymultinest, and Ultranest.
+        """
+        check_directory_exists_and_if_not_mkdir(self.outputfiles_basename)
+        if self.use_temporary_directory:
+            temporary_outputfiles_basename = tempfile.TemporaryDirectory().name
+            self.temporary_outputfiles_basename = temporary_outputfiles_basename
+
+            if os.path.exists(self.outputfiles_basename):
+                distutils.dir_util.copy_tree(self.outputfiles_basename, self.temporary_outputfiles_basename)
+            check_directory_exists_and_if_not_mkdir(temporary_outputfiles_basename)
+
+            self.kwargs["outputfiles_basename"] = self.temporary_outputfiles_basename
+            logger.info("Using temporary file {}".format(temporary_outputfiles_basename))
+        else:
+            self.kwargs["outputfiles_basename"] = self.outputfiles_basename
+            logger.info("Using output file {}".format(self.outputfiles_basename))
+        self.time_file_path = self.kwargs["outputfiles_basename"] + '/sampling_time.dat'
 
 
 class Error(Exception):
