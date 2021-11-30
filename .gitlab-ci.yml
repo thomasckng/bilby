@@ -263,7 +263,7 @@ deploy-docs:
 
 # Build the containers
 build-python37-container:
-  stage: deploy
+  stage: initial
   image: docker:19.03.12
   needs: ["containers"]
   only:
@@ -272,8 +272,8 @@ build-python37-container:
     - cd containers
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker build --tag v3-bilby-python37 - < v3-dockerfile-test-suite-python37
-    - docker image tag v3-bilby-python37 containers.ligo.org/lscsoft/bilby/v2-bilby-python37:latest
-    - docker image push containers.ligo.org/lscsoft/bilby/v2-bilby-python37:latest
+#    - docker image tag v3-bilby-python37 containers.ligo.org/lscsoft/bilby/v2-bilby-python37:latest
+#    - docker image push containers.ligo.org/lscsoft/bilby/v2-bilby-python37:latest
 
 build-python38-container:
   stage: deploy

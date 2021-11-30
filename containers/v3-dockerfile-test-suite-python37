@@ -16,9 +16,11 @@ RUN conda info
 RUN python --version
 
 # Install pymultinest requirements
-RUN apt-get update --allow-releaseinfo-change
-RUN apt-get install -y libblas3 libblas-dev liblapack3 liblapack-dev \
-libatlas3-base libatlas-base-dev cmake build-essential gfortran
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get -y install tzdata
+# RUN apt-get update --allow-releaseinfo-change
+# RUN apt-get install -y libblas3 libblas-dev liblapack3 liblapack-dev \
+# libatlas3-base libatlas-base-dev cmake build-essential gfortran
 
 # Install conda-installable programs
 RUN conda install -n ${conda_env} -y matplotlib numpy scipy pandas astropy flake8 mock
@@ -29,7 +31,7 @@ RUN conda install -n ${conda_env} -c conda-forge black ligo-gracedb gwpy lalsuit
 
 # Install pip-requirements
 RUN pip install --upgrade pip
-RUN pip install --upgrade setuptools coverage-badge
+RUN pip install --upgrade setuptools coverage-badge parameterized
 
 # Install documentation requirements
 RUN pip install sphinx numpydoc nbsphinx sphinx_rtd_theme sphinx-tabs autodoc
