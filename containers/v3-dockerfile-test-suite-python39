@@ -17,7 +17,7 @@ RUN python --version
 
 # Install conda-installable programs
 RUN conda install -n ${conda_env} -y matplotlib numpy scipy pandas astropy flake8 mock
-RUN conda install -n ${conda_env} -y anaconda coverage configargparse future
+RUN conda install -n ${conda_env} -c anaconda coverage configargparse future
 RUN conda install -n ${conda_env} -c conda-forge black pytest-cov deepdish arviz
 RUN conda install -n ${conda_env} -c conda-forge python-lalsimulation
 RUN conda install -n ${conda_env} -c conda-forge gwpy ligo.skymap ligo-gracedb
