@@ -78,6 +78,7 @@ basic-3.9:
   stage: initial
   script:
     - python -uc "import arviz; print(arviz.__version__)"
+    - python -m pip install --upgrade pymc3
     - python -uc "import pymc3; print(pymc3.__version__)"
     - python test/test_samplers_import.py
 
