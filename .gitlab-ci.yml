@@ -74,6 +74,26 @@ basic-3.9:
   image: python:3.9
 
 
+.test-samplers-import: &test-samplers-import
+  stage: initial
+  script:
+    - python -uc "import arviz; print(arviz.__version__)"
+    - python -uc "import pymc3; print(pymc3.__version__)"
+    - python test/test_samplers_import.py
+
+
+import-samplers-3.7:
+  <<: *test-samplers-import
+  image: containers.ligo.org/lscsoft/bilby/v2-bilby-python37
+
+import-samplers-3.8:
+  <<: *test-samplers-import
+  image: containers.ligo.org/lscsoft/bilby/v2-bilby-python38
+
+import-samplers-3.9:
+  <<: *test-samplers-import
+  image: containers.ligo.org/lscsoft/bilby/v2-bilby-python39
+
 precommits-py3.7:
   stage: initial
   image: containers.ligo.org/lscsoft/bilby/v2-bilby-python37
