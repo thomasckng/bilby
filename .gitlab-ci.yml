@@ -152,7 +152,7 @@ python-3.8:
 # test example on python 3.9
 python-3.9:
   stage: test
-  needs: ["basic-3.9", "precommits-py3.9", "build-python39-container"]
+  needs: ["basic-3.9", "precommits-py3.9"]
   image: containers.ligo.org/lscsoft/bilby/v2-bilby-python39
   script:
     - python -m pip install .
