@@ -291,8 +291,8 @@ build-python38-container:
     - cd containers
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker build --tag v3-bilby-python38 - < v3-dockerfile-test-suite-python38
-    - docker image tag v3-bilby-python38 containers.ligo.org/lscsoft/bilby/v2-bilby-python38:latest
-    - docker image push containers.ligo.org/lscsoft/bilby/v2-bilby-python38:latest
+    # - docker image tag v3-bilby-python38 containers.ligo.org/lscsoft/bilby/v2-bilby-python38:latest
+    # - docker image push containers.ligo.org/lscsoft/bilby/v2-bilby-python38:latest
 
 build-python39-container:
 #  stage: deploy

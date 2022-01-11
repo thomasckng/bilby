@@ -15,12 +15,12 @@ repos:
     hooks:
     -   id: codespell
         args: [--ignore-words=.dictionary.txt]
--   repo: https://github.com/asottile/seed-isort-config
-    rev: v1.3.0
-    hooks:
-    -   id: seed-isort-config
-        args: [--application-directories, 'bilby/']
-        files: ^bilby/bilby_mcmc/
+# -   repo: https://github.com/asottile/seed-isort-config
+#     rev: v1.3.0
+#     hooks:
+#     -   id: seed-isort-config
+#         args: [--application-directories, 'bilby/']
+#         files: ^bilby/bilby_mcmc/
 -   repo: https://github.com/pre-commit/mirrors-isort
     rev: v4.3.21
     hooks:
