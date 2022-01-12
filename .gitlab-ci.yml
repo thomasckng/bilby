@@ -141,7 +141,7 @@ precommits-py3.9:
 # test example on python 3.7 and build coverage
 python-3.7:
   stage: test
-  needs: ["basic-3.7", "precommits-py3.7"]
+  needs: ["basic-3.7", "precommits-py3.7", "build-python37-container"]
   image: containers.ligo.org/lscsoft/bilby/v2-bilby-python37
   script:
     - python -m pip install .
@@ -162,7 +162,7 @@ python-3.7:
 # test example on python 3.8
 python-3.8:
   stage: test
-  needs: ["basic-3.8", "precommits-py3.8"]
+  needs: ["basic-3.8", "precommits-py3.8", "build-python38-container"]
   image: containers.ligo.org/lscsoft/bilby/v2-bilby-python38
   script:
     - python -m pip install .
@@ -171,7 +171,7 @@ python-3.8:
 # test example on python 3.9
 python-3.9:
   stage: test
-  needs: ["basic-3.9", "precommits-py3.9"]
+  needs: ["basic-3.9", "precommits-py3.9", "build-python39-container"]
   image: containers.ligo.org/lscsoft/bilby/v2-bilby-python39
   script:
     - python -m pip install .
@@ -181,7 +181,7 @@ python-3.9:
 # test samplers on python 3.7
 python-3.7-samplers:
   stage: test
-  needs: ["basic-3.7", "precommits-py3.7"]
+  needs: ["basic-3.7", "precommits-py3.7", "build-python37-container"]
   image: containers.ligo.org/lscsoft/bilby/v2-bilby-python37
   script:
     - python -m pip install .
@@ -191,7 +191,7 @@ python-3.7-samplers:
 # test samplers on python 3.8
 python-3.8-samplers:
   stage: test
-  needs: ["basic-3.8", "precommits-py3.8"]
+  needs: ["basic-3.8", "precommits-py3.8", "build-python38-container"]
   image: containers.ligo.org/lscsoft/bilby/v2-bilby-python38
   script:
     - python -m pip install .
@@ -201,7 +201,7 @@ python-3.8-samplers:
 # test samplers on python 3.9
 python-3.9-samplers:
   stage: test
-  needs: ["basic-3.9", "precommits-py3.9"]
+  needs: ["basic-3.9", "precommits-py3.9", "build-python39-container"]
   image: containers.ligo.org/lscsoft/bilby/v2-bilby-python39
   script:
     - python -m pip install .
@@ -286,11 +286,12 @@ deploy-docs:
 
 # Build the containers
 build-python37-container:
-  stage: deploy
+#  stage: deploy
+  stage: initial
   image: docker:19.03.12
   needs: ["containers"]
-  only:
-    - schedules
+#  only:
+#    - schedules
   script:
     - cd containers
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
@@ -299,11 +300,12 @@ build-python37-container:
     - docker image push containers.ligo.org/lscsoft/bilby/v2-bilby-python37:latest
 
 build-python38-container:
-  stage: deploy
+#  stage: deploy
+  stage: initial
   image: docker:19.03.12
   needs: ["containers"]
-  only:
-    - schedules
+#  only:
+#    - schedules
   script:
     - cd containers
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
@@ -312,11 +314,12 @@ build-python38-container:
     - docker image push containers.ligo.org/lscsoft/bilby/v2-bilby-python38:latest
 
 build-python39-container:
-  stage: deploy
+#  stage: deploy
+  stage: initial
   image: docker:19.03.12
   needs: ["containers"]
-  only:
-    - schedules
+#  only:
+#    - schedules
   script:
     - cd containers
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
