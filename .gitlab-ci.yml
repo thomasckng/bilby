@@ -82,6 +82,7 @@ basic-3.9:
   stage: initial
   script:
     - python -m pip install .
+    - python -m pip list installed
     - python test/test_samplers_import.py
 
 
