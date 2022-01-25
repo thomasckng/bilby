@@ -21,3 +21,7 @@ repos:
     -   id: isort # sort imports alphabetically and separates import into sections
         args: [-w=88, -m=3, -tc, -sp=setup.cfg ]
         files: ^bilby/bilby_mcmc/
+-   repo: https://github.com/ikamensh/flynt/
+    rev: ''
+    hooks:
+    -   id: flynt
