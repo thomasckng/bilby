@@ -47,11 +47,16 @@ _sampler_kwargs = dict(
         ntemps=1,
         frac_threshold=0.5,
     ),
-    PTMCMCsampler=dict(Niter=101, burn=2, isave=100),
-    pymc3=dict(draws=50, tune=50, n_init=250),
+    PTMCMCSampler=dict(Niter=101, burn=2, isave=100),
+    # pymc3=dict(draws=50, tune=50, n_init=250),  removed until testing issue can be resolved
     pymultinest=dict(nlive=100),
     pypolychord=dict(nlive=100),
     ultranest=dict(nlive=100, resume="overwrite", temporary_directory=False),
+)
+
+sampler_imports = dict(
+    bilby_mcmc="bilby",
+    dynamic_dynesty="dynesty"
 )
 
 
@@ -90,12 +95,12 @@ class TestRunningSamplers(unittest.TestCase):
 
     @parameterized.expand(_sampler_kwargs.keys())
     def test_run_sampler_single(self, sampler):
-        pytest.importorskip(sampler)
+        pytest.importorskip(sampler_imports.get(sampler, sampler))
         self._run_sampler(sampler, pool_size=1)
 
     @parameterized.expand(_sampler_kwargs.keys())
     def test_run_sampler_pool(self, sampler):
-        pytest.importorskip(sampler)
+        pytest.importorskip(sampler_imports.get(sampler, sampler))
         self._run_sampler(sampler, pool_size=1)
 
     def _run_sampler(self, sampler, pool_size, **extra_kwargs):
