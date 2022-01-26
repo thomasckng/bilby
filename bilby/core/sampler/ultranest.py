@@ -113,7 +113,7 @@ class Ultranest(_TemporaryFileSampler, NestedSampler):
             kwargs["show_status"] = kwargs.pop("verbose")
 
     def _verify_kwargs_against_default_kwargs(self):
-        """ Check the kwargs """
+        """Check the kwargs"""
 
         self.outputfiles_basename = self.kwargs.pop("log_dir", None)
         if self.kwargs["viz_callback"] is None:
@@ -130,8 +130,8 @@ class Ultranest(_TemporaryFileSampler, NestedSampler):
 
     def _apply_ultranest_boundaries(self):
         if (
-                self.kwargs["wrapped_params"] is None
-                or len(self.kwargs.get("wrapped_params", [])) == 0
+            self.kwargs["wrapped_params"] is None
+            or len(self.kwargs.get("wrapped_params", [])) == 0
         ):
             self.kwargs["wrapped_params"] = []
             for param, value in self.priors.items():
@@ -265,16 +265,18 @@ class Ultranest(_TemporaryFileSampler, NestedSampler):
         nested_samples = DataFrame(data, columns=self.search_parameter_keys)
         nested_samples["weights"] = weights
         nested_samples["log_likelihood"] = out["weighted_samples"]["logl"]
-        self.result.log_likelihood_evaluations = np.array(out["weighted_samples"]["logl"])[
-            mask
-        ]
+        self.result.log_likelihood_evaluations = np.array(
+            out["weighted_samples"]["logl"]
+        )[mask]
         self.result.sampler_output = out
         self.result.samples = data[mask, :]
         self.result.nested_samples = nested_samples
         self.result.log_evidence = out["logz"]
         self.result.log_evidence_err = out["logzerr"]
         if self.kwargs["num_live_points"] is not None:
-            self.result.information_gain = np.power(out["logzerr"], 2) * self.kwargs["num_live_points"]
+            self.result.information_gain = (
+                np.power(out["logzerr"], 2) * self.kwargs["num_live_points"]
+            )
 
         self.result.outputfiles_basename = self.outputfiles_basename
         self.result.sampling_time = datetime.timedelta(seconds=self.total_sampling_time)

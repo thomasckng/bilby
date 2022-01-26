@@ -1,5 +1,5 @@
-import time
 import datetime
+import time
 
 import numpy as np
 import pandas as pd
@@ -9,8 +9,9 @@ from .base_sampler import NestedSampler, _TemporaryFileSampler, signal_wrapper
 
 
 class _DNest4Model(object):
-
-    def __init__(self, log_likelihood_func, from_prior_func, widths, centers, highs, lows):
+    def __init__(
+        self, log_likelihood_func, from_prior_func, widths, centers, highs, lows
+    ):
         """Initialize the DNest4 model.
         Args:
             log_likelihood_func: function
@@ -43,7 +44,7 @@ class _DNest4Model(object):
         """The perturb function to perform Monte Carlo trial moves."""
         idx = np.random.randint(self._n_dim)
 
-        coords[idx] += (self._widths[idx] * (np.random.uniform(size=1) - 0.5))
+        coords[idx] += self._widths[idx] * (np.random.uniform(size=1) - 0.5)
         cw = self._widths[idx]
         cc = self._centers[idx]
 
@@ -54,7 +55,9 @@ class _DNest4Model(object):
     @staticmethod
     def wrap(x, minimum, maximum):
         if maximum <= minimum:
-            raise ValueError("maximum {} <= minimum {}, when trying to wrap coordinates".format(maximum, minimum))
+            raise ValueError(
+                f"maximum {maximum} <= minimum {minimum}, when trying to wrap coordinates"
+            )
         return (x - minimum) % (maximum - minimum) + minimum
 
 
@@ -95,21 +98,48 @@ class DNest4(_TemporaryFileSampler, NestedSampler):
         If True, prints information during run
     """
 
-    default_kwargs = dict(max_num_levels=20, num_steps=500,
-                          new_level_interval=10000, num_per_step=10000,
-                          thread_steps=1, num_particles=1000, lam=10.0,
-                          beta=100, seed=None, verbose=True, outputfiles_basename=None,
-                          backend='memory')
+    default_kwargs = dict(
+        max_num_levels=20,
+        num_steps=500,
+        new_level_interval=10000,
+        num_per_step=10000,
+        thread_steps=1,
+        num_particles=1000,
+        lam=10.0,
+        beta=100,
+        seed=None,
+        verbose=True,
+        outputfiles_basename=None,
+        backend="memory",
+    )
 
     short_name = "dn4"
 
-    def __init__(self, likelihood, priors, outdir="outdir", label="label", use_ratio=False, plot=False,
-                 exit_code=77, skip_import_verification=False, temporary_directory=True, **kwargs):
+    def __init__(
+        self,
+        likelihood,
+        priors,
+        outdir="outdir",
+        label="label",
+        use_ratio=False,
+        plot=False,
+        exit_code=77,
+        skip_import_verification=False,
+        temporary_directory=True,
+        **kwargs,
+    ):
         super(DNest4, self).__init__(
-            likelihood=likelihood, priors=priors, outdir=outdir, label=label,
-            use_ratio=use_ratio, plot=plot, skip_import_verification=skip_import_verification,
+            likelihood=likelihood,
+            priors=priors,
+            outdir=outdir,
+            label=label,
+            use_ratio=use_ratio,
+            plot=plot,
+            skip_import_verification=skip_import_verification,
             temporary_directory=temporary_directory,
-            exit_code=exit_code, **kwargs)
+            exit_code=exit_code,
+            **kwargs,
+        )
 
         self.num_particles = self.kwargs["num_particles"]
         self.max_num_levels = self.kwargs["max_num_levels"]
@@ -146,13 +176,22 @@ class DNest4(_TemporaryFileSampler, NestedSampler):
         self._highs = np.array(highs)
         self._lows = np.array(lows)
 
-        self._dnest4_model = _DNest4Model(self.log_likelihood, self.get_random_draw_from_prior, self._widths,
-                                          self._centers, self._highs, self._lows)
+        self._dnest4_model = _DNest4Model(
+            self.log_likelihood,
+            self.get_random_draw_from_prior,
+            self._widths,
+            self._centers,
+            self._highs,
+            self._lows,
+        )
 
     def _set_backend(self):
         import dnest4
-        if self._backend == 'csv':
-            return dnest4.backends.CSVBackend("{}/dnest4{}/".format(self.outdir, self.label), sep=" ")
+
+        if self._backend == "csv":
+            return dnest4.backends.CSVBackend(
+                f"{self.outdir}/dnest4{self.label}/", sep=" "
+            )
         else:
             return dnest4.backends.MemoryBackend()
 
@@ -173,31 +212,37 @@ class DNest4(_TemporaryFileSampler, NestedSampler):
         self.start_time = time.time()
 
         self.sampler = dnest4.DNest4Sampler(self._dnest4_model, backend=backend)
-        out = self.sampler.sample(self.max_num_levels,
-                                  num_particles=self.num_particles,
-                                  **self.dnest4_kwargs)
+        out = self.sampler.sample(
+            self.max_num_levels, num_particles=self.num_particles, **self.dnest4_kwargs
+        )
 
         for i, sample in enumerate(out):
             if self._verbose and ((i + 1) % 100 == 0):
                 stats = self.sampler.postprocess()
-                logger.info("Iteration: {0} log(Z): {1}".format(i + 1, stats['log_Z']))
+                logger.info(f"Iteration: {i + 1} log(Z): {stats['log_Z']}")
 
         self._calculate_and_save_sampling_time()
         self._clean_up_run_directory()
 
         stats = self.sampler.postprocess(resample=1)
-        self.result.log_evidence = stats['log_Z']
-        self._information = stats['H']
+        self.result.log_evidence = stats["log_Z"]
+        self._information = stats["H"]
         self.result.log_evidence_err = np.sqrt(self._information / self.num_particles)
 
-        if self._backend == 'memory':
-            self._last_live_sample_info = pd.DataFrame(self.sampler.backend.sample_info[-1])
-            self.result.log_likelihood_evaluations = self._last_live_sample_info['log_likelihood']
+        if self._backend == "memory":
+            self._last_live_sample_info = pd.DataFrame(
+                self.sampler.backend.sample_info[-1]
+            )
+            self.result.log_likelihood_evaluations = self._last_live_sample_info[
+                "log_likelihood"
+            ]
             self.result.samples = np.array(self.sampler.backend.posterior_samples)
         else:
-            sample_info_path = './' + self.kwargs["outputfiles_basename"] + '/sample_info.txt'
-            sample_info = np.genfromtxt(sample_info_path, comments='#', names=True)
-            self.result.log_likelihood_evaluations = sample_info['log_likelihood']
+            sample_info_path = (
+                "./" + self.kwargs["outputfiles_basename"] + "/sample_info.txt"
+            )
+            sample_info = np.genfromtxt(sample_info_path, comments="#", names=True)
+            self.result.log_likelihood_evaluations = sample_info["log_likelihood"]
             self.result.samples = np.array(self.sampler.backend.posterior_samples)
 
         self.result.sampler_output = out
@@ -209,10 +254,10 @@ class DNest4(_TemporaryFileSampler, NestedSampler):
         return self.result
 
     def _translate_kwargs(self, kwargs):
-        if 'num_steps' not in kwargs:
+        if "num_steps" not in kwargs:
             for equiv in self.walks_equiv_kwargs:
                 if equiv in kwargs:
-                    kwargs['num_steps'] = kwargs.pop(equiv)
+                    kwargs["num_steps"] = kwargs.pop(equiv)
 
     def _verify_kwargs_against_default_kwargs(self):
         self.outputfiles_basename = self.kwargs.pop("outputfiles_basename", None)

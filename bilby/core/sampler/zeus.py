@@ -64,7 +64,7 @@ class Zeus(Emcee):
         burn_in_fraction=0.25,
         resume=True,
         burn_in_act=3,
-        **kwargs
+        **kwargs,
     ):
         super(Zeus, self).__init__(
             likelihood=likelihood,
@@ -79,7 +79,7 @@ class Zeus(Emcee):
             burn_in_fraction=burn_in_fraction,
             resume=resume,
             burn_in_act=burn_in_act,
-            **kwargs
+            **kwargs,
         )
 
     def _translate_kwargs(self, kwargs):
@@ -121,6 +121,7 @@ class Zeus(Emcee):
 
     def _initialise_sampler(self):
         from zeus import EnsembleSampler
+
         self._sampler = EnsembleSampler(**self.sampler_init_kwargs)
         self._init_chain_file()
 
@@ -173,10 +174,12 @@ class Zeus(Emcee):
         if self.result.nburn > self.nsteps:
             raise SamplerError(
                 "The run has finished, but the chain is not burned in: "
-                "`nburn < nsteps` ({} < {}). Try increasing the "
-                "number of steps.".format(self.result.nburn, self.nsteps)
+                f"`nburn < nsteps` ({self.result.nburn} < {self.nsteps})."
+                " Try increasing the number of steps."
             )
-        blobs = np.array(self.sampler.get_blobs(flat=True, discard=self.nburn)).reshape((-1, 2))
+        blobs = np.array(self.sampler.get_blobs(flat=True, discard=self.nburn)).reshape(
+            (-1, 2)
+        )
         log_likelihoods, log_priors = blobs.T
         self.result.log_likelihood_evaluations = log_likelihoods
         self.result.log_prior_evaluations = log_priors

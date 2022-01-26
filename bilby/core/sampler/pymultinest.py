@@ -1,7 +1,7 @@
+import datetime
 import importlib
 import os
 import time
-import datetime
 
 import numpy as np
 

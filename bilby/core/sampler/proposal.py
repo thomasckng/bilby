@@ -1,14 +1,13 @@
+import random
 from collections import OrderedDict
 from inspect import isclass
 
 import numpy as np
-import random
 
 from ..prior import Uniform
 
 
 class Sample(OrderedDict):
-
     def __init__(self, dictionary=None):
         if dictionary is None:
             dictionary = dict()
@@ -32,15 +31,14 @@ class Sample(OrderedDict):
 
     @classmethod
     def from_external_type(cls, external_sample, sampler_name):
-        if sampler_name == 'cpnest':
+        if sampler_name == "cpnest":
             return cls.from_cpnest_live_point(external_sample)
         return external_sample
 
 
 class JumpProposal(object):
-
     def __init__(self, priors=None):
-        """ A generic class for jump proposals
+        """A generic class for jump proposals
 
         Parameters
         ==========
@@ -57,7 +55,7 @@ class JumpProposal(object):
         self.log_j = 0.0
 
     def __call__(self, sample, **kwargs):
-        """ A generic wrapper for the jump proposal function
+        """A generic wrapper for the jump proposal function
 
         Parameters
         ==========
@@ -72,26 +70,35 @@ class JumpProposal(object):
         return self._apply_boundaries(sample)
 
     def _move_reflecting_keys(self, sample):
-        keys = [key for key in sample.keys()
-                if self.priors[key].boundary == 'reflective']
+        keys = [
+            key for key in sample.keys() if self.priors[key].boundary == "reflective"
+        ]
         for key in keys:
-            if sample[key] > self.priors[key].maximum or sample[key] < self.priors[key].minimum:
+            if (
+                sample[key] > self.priors[key].maximum
+                or sample[key] < self.priors[key].minimum
+            ):
                 r = self.priors[key].maximum - self.priors[key].minimum
                 delta = (sample[key] - self.priors[key].minimum) % (2 * r)
                 if delta > r:
-                    sample[key] = 2 * self.priors[key].maximum - self.priors[key].minimum - delta
+                    sample[key] = (
+                        2 * self.priors[key].maximum - self.priors[key].minimum - delta
+                    )
                 elif delta < r:
                     sample[key] = self.priors[key].minimum + delta
         return sample
 
     def _move_periodic_keys(self, sample):
-        keys = [key for key in sample.keys()
-                if self.priors[key].boundary == 'periodic']
+        keys = [key for key in sample.keys() if self.priors[key].boundary == "periodic"]
         for key in keys:
-            if sample[key] > self.priors[key].maximum or sample[key] < self.priors[key].minimum:
-                sample[key] = (self.priors[key].minimum +
-                               ((sample[key] - self.priors[key].minimum) %
-                                (self.priors[key].maximum - self.priors[key].minimum)))
+            if (
+                sample[key] > self.priors[key].maximum
+                or sample[key] < self.priors[key].minimum
+            ):
+                sample[key] = self.priors[key].minimum + (
+                    (sample[key] - self.priors[key].minimum)
+                    % (self.priors[key].maximum - self.priors[key].minimum)
+                )
         return sample
 
     def _apply_boundaries(self, sample):
@@ -101,9 +108,8 @@ class JumpProposal(object):
 
 
 class JumpProposalCycle(object):
-
     def __init__(self, proposal_functions, weights, cycle_length=100):
-        """ A generic wrapper class for proposal cycles
+        """A generic wrapper class for proposal cycles
 
         Parameters
         ==========
@@ -130,8 +136,12 @@ class JumpProposalCycle(object):
         return len(self.proposal_functions)
 
     def update_cycle(self):
-        self._cycle = np.random.choice(self.proposal_functions, size=self.cycle_length,
-                                       p=self.weights, replace=True)
+        self._cycle = np.random.choice(
+            self.proposal_functions,
+            size=self.cycle_length,
+            p=self.weights,
+            replace=True,
+        )
 
     @property
     def proposal_functions(self):
@@ -191,9 +201,13 @@ class NormJump(JumpProposal):
 
 
 class EnsembleWalk(JumpProposal):
-
-    def __init__(self, random_number_generator=random.random, n_points=3, priors=None,
-                 **random_number_generator_args):
+    def __init__(
+        self,
+        random_number_generator=random.random,
+        n_points=3,
+        priors=None,
+        **random_number_generator_args
+    ):
         """
         An ensemble walk
 
@@ -214,12 +228,16 @@ class EnsembleWalk(JumpProposal):
         self.random_number_generator_args = random_number_generator_args
 
     def __call__(self, sample, **kwargs):
-        subset = random.sample(kwargs['coordinates'], self.n_points)
+        subset = random.sample(kwargs["coordinates"], self.n_points)
         for i in range(len(subset)):
-            subset[i] = Sample.from_external_type(subset[i], kwargs.get('sampler_name', None))
+            subset[i] = Sample.from_external_type(
+                subset[i], kwargs.get("sampler_name", None)
+            )
         center_of_mass = self.get_center_of_mass(subset)
         for x in subset:
-            sample += (x - center_of_mass) * self.random_number_generator(**self.random_number_generator_args)
+            sample += (x - center_of_mass) * self.random_number_generator(
+                **self.random_number_generator_args
+            )
         return super(EnsembleWalk, self).__call__(sample)
 
     @staticmethod
@@ -228,7 +246,6 @@ class EnsembleWalk(JumpProposal):
 
 
 class EnsembleStretch(JumpProposal):
-
     def __init__(self, scale=2.0, priors=None):
         """
         Stretch move. Calculates the log Jacobian which can be used in cpnest to bias future moves.
@@ -242,8 +259,10 @@ class EnsembleStretch(JumpProposal):
         self.scale = scale
 
     def __call__(self, sample, **kwargs):
-        second_sample = random.choice(kwargs['coordinates'])
-        second_sample = Sample.from_external_type(second_sample, kwargs.get('sampler_name', None))
+        second_sample = random.choice(kwargs["coordinates"])
+        second_sample = Sample.from_external_type(
+            second_sample, kwargs.get("sampler_name", None)
+        )
         step = random.uniform(-1, 1) * np.log(self.scale)
         sample = second_sample + (sample - second_sample) * np.exp(step)
         self.log_j = len(sample) * step
@@ -251,7 +270,6 @@ class EnsembleStretch(JumpProposal):
 
 
 class DifferentialEvolution(JumpProposal):
-
     def __init__(self, sigma=1e-4, mu=1.0, priors=None):
         """
         Differential evolution step. Takes two elements from the existing coordinates and differentially evolves the
@@ -269,13 +287,12 @@ class DifferentialEvolution(JumpProposal):
         self.mu = mu
 
     def __call__(self, sample, **kwargs):
-        a, b = random.sample(kwargs['coordinates'], 2)
+        a, b = random.sample(kwargs["coordinates"], 2)
         sample = sample + (b - a) * random.gauss(self.mu, self.sigma)
         return super(DifferentialEvolution, self).__call__(sample)
 
 
 class EnsembleEigenVector(JumpProposal):
-
     def __init__(self, priors=None):
         """
         Ensemble step based on the ensemble eigenvectors.
@@ -317,7 +334,7 @@ class EnsembleEigenVector(JumpProposal):
         self.eigen_values, self.eigen_vectors = np.linalg.eigh(self.covariance)
 
     def __call__(self, sample, **kwargs):
-        self.update_eigenvectors(kwargs['coordinates'])
+        self.update_eigenvectors(kwargs["coordinates"])
         i = random.randrange(len(sample))
         jump_size = np.sqrt(np.fabs(self.eigen_values[i])) * random.gauss(0, 1)
         for j, key in enumerate(sample.keys()):
