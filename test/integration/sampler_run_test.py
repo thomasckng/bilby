@@ -73,10 +73,6 @@ class TestRunningSamplers(unittest.TestCase):
         self.priors = bilby.core.prior.PriorDict()
         self.priors["m"] = bilby.core.prior.Uniform(0, 5, boundary="periodic")
         self.priors["c"] = bilby.core.prior.Uniform(-2, 2, boundary="reflective")
-        self.kwargs = dict(
-            save=False,
-            conversion_function=self.conversion_function,
-        )
         bilby.core.utils.check_directory_exists_and_if_not_mkdir("outdir")
 
     @staticmethod
@@ -112,6 +108,7 @@ class TestRunningSamplers(unittest.TestCase):
             sampler=sampler,
             save=True,
             npool=pool_size,
+            conversion_function=self.conversion_function,
             **kwargs,
             **extra_kwargs,
         )
