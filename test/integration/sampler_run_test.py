@@ -72,7 +72,18 @@ class TestRunningSamplers(unittest.TestCase):
         self.priors = bilby.core.prior.PriorDict()
         self.priors["m"] = bilby.core.prior.Uniform(0, 5, boundary="periodic")
         self.priors["c"] = bilby.core.prior.Uniform(-2, 2, boundary="reflective")
+        self.kwargs = dict(
+            save=False,
+            conversion_function=self.conversion_function,
+        )
         bilby.core.utils.check_directory_exists_and_if_not_mkdir("outdir")
+
+    @staticmethod
+    def conversion_function(parameters, likelihood, prior):
+        converted = parameters.copy()
+        if "derived" not in converted:
+            converted["derived"] = converted["m"] * converted["c"]
+        return converted
 
     def tearDown(self):
         del self.likelihood
@@ -82,17 +93,19 @@ class TestRunningSamplers(unittest.TestCase):
 
     @parameterized.expand(_sampler_kwargs.keys())
     def test_run_sampler_single(self, sampler):
+        pytest.importorskip(sampler)
         self._run_sampler(sampler, pool_size=1)
 
     @parameterized.expand(_sampler_kwargs.keys())
     def test_run_sampler_pool(self, sampler):
+        pytest.importorskip(sampler)
         self._run_sampler(sampler, pool_size=1)
 
     def _run_sampler(self, sampler, pool_size, **extra_kwargs):
         bilby.core.utils.check_directory_exists_and_if_not_mkdir("outdir")
         kwargs = _sampler_kwargs[sampler]
         kwargs["resume"] = kwargs.get("resume", False)
-        _ = bilby.run_sampler(
+        res = bilby.run_sampler(
             likelihood=self.likelihood,
             priors=self.priors,
             sampler=sampler,
@@ -101,16 +114,21 @@ class TestRunningSamplers(unittest.TestCase):
             **kwargs,
             **extra_kwargs,
         )
+        assert "derived" in res.posterior
+        assert res.log_likelihood_evaluations is not None
 
     @parameterized.expand(_sampler_kwargs.keys())
     def test_interrupt_sampler_single(self, sampler):
+        pytest.importorskip(sampler)
         self._run_sampler(sampler, pool_size=1)
 
     @parameterized.expand(_sampler_kwargs.keys())
     def test_interrupt_sampler_pool(self, sampler):
+        pytest.importorskip(sampler)
         self._run_sampler(sampler, pool_size=1)
 
     def _run_with_signal_handling(self, sampler, pool_size=1):
+        pytest.importorskip(sampler)
         pid = os.getpid()
 
         def trigger_signal():
