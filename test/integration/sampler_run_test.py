@@ -7,6 +7,7 @@ from signal import SIGINT
 multiprocessing.set_start_method("fork")  # noqa
 
 import unittest
+import pytest
 from parameterized import parameterized
 import shutil
 
