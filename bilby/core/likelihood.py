@@ -4,7 +4,8 @@ import numpy as np
 from scipy.special import gammaln, xlogy
 from scipy.stats import multivariate_normal
 
-from .utils import infer_parameters_from_function
+from .utils.introspection import infer_parameters_from_function
+from .utils.io import _generic_class_repr
 
 
 class Likelihood(object):
@@ -22,7 +23,7 @@ class Likelihood(object):
         self._marginalized_parameters = []
 
     def __repr__(self):
-        return self.__class__.__name__ + '(parameters={})'.format(self.parameters)
+        return _generic_class_repr(self)
 
     def log_likelihood(self):
         """
@@ -91,6 +92,9 @@ class ZeroLikelihood(Likelihood):
     def __getattr__(self, name):
         return getattr(self._parent, name)
 
+    def __repr__(self):
+        return f"ZeroLikelihood({repr(self._parent)})"
+
 
 class Analytical1DLikelihood(Likelihood):
     """
@@ -115,9 +119,6 @@ class Analytical1DLikelihood(Likelihood):
         self.y = y
         self._func = func
         self._function_keys = list(self.parameters.keys())
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(x={}, y={}, func={})'.format(self.x, self.y, self.func.__name__)
 
     @property
     def func(self):
@@ -202,10 +203,6 @@ class GaussianLikelihood(Analytical1DLikelihood):
                        np.log(2 * np.pi * self.sigma**2) / 2)
         return log_l
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(x={}, y={}, func={}, sigma={})' \
-            .format(self.x, self.y, self.func.__name__, self.sigma)
-
     @property
     def sigma(self):
         """
@@ -258,7 +255,7 @@ class PoissonLikelihood(Analytical1DLikelihood):
         if not isinstance(rate, np.ndarray):
             raise ValueError(
                 "Poisson rate function returns wrong value type! "
-                "Is {} when it should be numpy.ndarray".format(type(rate)))
+                f"Is {type(rate)} when it should be numpy.ndarray")
         elif np.any(rate < 0.):
             raise ValueError(("Poisson rate function returns a negative",
                               " value!"))
@@ -266,9 +263,6 @@ class PoissonLikelihood(Analytical1DLikelihood):
             return -np.inf
         else:
             return np.sum(-rate + self.y * np.log(rate) - gammaln(self.y + 1))
-
-    def __repr__(self):
-        return Analytical1DLikelihood.__repr__(self)
 
     @property
     def y(self):
@@ -309,9 +303,6 @@ class ExponentialLikelihood(Analytical1DLikelihood):
         if np.any(mu < 0.):
             return -np.inf
         return -np.sum(np.log(mu) + (self.y / mu))
-
-    def __repr__(self):
-        return Analytical1DLikelihood.__repr__(self)
 
     @property
     def y(self):
@@ -377,11 +368,6 @@ class StudentTLikelihood(Analytical1DLikelihood):
                    np.log(self.lam / (nu * np.pi)) / 2 +
                    gammaln((nu + 1) / 2) - gammaln(nu / 2))
         return log_l
-
-    def __repr__(self):
-        base_string = '(x={}, y={}, func={}, nu={}, sigma={})'
-        return self.__class__.__name__ + base_string.format(
-            self.x, self.y, self.func.__name__, self.nu, self.sigma)
 
     @property
     def lam(self):
@@ -466,7 +452,7 @@ class AnalyticalMultidimensionalCovariantGaussian(Likelihood):
         self.mean = np.atleast_1d(mean)
         self.sigma = np.sqrt(np.diag(self.cov))
         self.pdf = multivariate_normal(mean=self.mean, cov=self.cov)
-        parameters = {"x{0}".format(i): 0 for i in range(self.dim)}
+        parameters = {f"x{i}": 0 for i in range(self.dim)}
         super(AnalyticalMultidimensionalCovariantGaussian, self).__init__(parameters=parameters)
 
     @property
@@ -474,7 +460,7 @@ class AnalyticalMultidimensionalCovariantGaussian(Likelihood):
         return len(self.cov[0])
 
     def log_likelihood(self):
-        x = np.array([self.parameters["x{0}".format(i)] for i in range(self.dim)])
+        x = np.array([self.parameters[f"x{i}"] for i in range(self.dim)])
         return self.pdf.logpdf(x)
 
 
@@ -499,7 +485,7 @@ class AnalyticalMultidimensionalBimodalCovariantGaussian(Likelihood):
         self.mean_2 = np.atleast_1d(mean_2)
         self.pdf_1 = multivariate_normal(mean=self.mean_1, cov=self.cov)
         self.pdf_2 = multivariate_normal(mean=self.mean_2, cov=self.cov)
-        parameters = {"x{0}".format(i): 0 for i in range(self.dim)}
+        parameters = {f"x{i}": 0 for i in range(self.dim)}
         super(AnalyticalMultidimensionalBimodalCovariantGaussian, self).__init__(parameters=parameters)
 
     @property
@@ -507,7 +493,7 @@ class AnalyticalMultidimensionalBimodalCovariantGaussian(Likelihood):
         return len(self.cov[0])
 
     def log_likelihood(self):
-        x = np.array([self.parameters["x{0}".format(i)] for i in range(self.dim)])
+        x = np.array([self.parameters[f"x{i}"] for i in range(self.dim)])
         return -np.log(2) + np.logaddexp(self.pdf_1.logpdf(x), self.pdf_2.logpdf(x))
 
 

@@ -98,15 +98,8 @@ class Interferometer(object):
         return False
 
     def __repr__(self):
-        return self.__class__.__name__ + '(name=\'{}\', power_spectral_density={}, minimum_frequency={}, ' \
-                                         'maximum_frequency={}, length={}, latitude={}, longitude={}, elevation={}, ' \
-                                         'xarm_azimuth={}, yarm_azimuth={}, xarm_tilt={}, yarm_tilt={})' \
-            .format(self.name, self.power_spectral_density, float(self.strain_data.minimum_frequency),
-                    float(self.strain_data.maximum_frequency), float(self.geometry.length),
-                    float(self.geometry.latitude), float(self.geometry.longitude),
-                    float(self.geometry.elevation), float(self.geometry.xarm_azimuth),
-                    float(self.geometry.yarm_azimuth), float(self.geometry.xarm_tilt),
-                    float(self.geometry.yarm_tilt))
+        from ...core.utils.io import _generic_class_repr
+        return _generic_class_repr(self)
 
     def set_strain_data_from_gwpy_timeseries(self, time_series):
         """ Set the `Interferometer.strain_data` from a gwpy TimeSeries
@@ -315,7 +308,7 @@ class Interferometer(object):
 
         signal_ifo[self.strain_data.frequency_mask] *= self.calibration_model.get_calibration_factor(
             self.strain_data.frequency_array[self.strain_data.frequency_mask],
-            prefix='recalib_{}_'.format(self.name), **parameters)
+            prefix=f'recalib_{self.name}_', **parameters)
 
         return signal_ifo
 
@@ -456,8 +449,9 @@ class Interferometer(object):
         """
         if not self.strain_data.time_within_data(parameters['geocent_time']):
             logger.warning(
-                'Injecting signal outside segment, start_time={}, merger time={}.'
-                .format(self.strain_data.start_time, parameters['geocent_time']))
+                f'Injecting signal outside segment, start_time={self.start_time}, '
+                f'merger time={parameters["geocent_time"]}.'
+            )
 
         signal_ifo = self.get_detector_response(injection_polarizations, parameters)
         self.strain_data.frequency_domain_strain += signal_ifo
@@ -468,11 +462,11 @@ class Interferometer(object):
             self.matched_filter_snr(signal=signal_ifo))
         self.meta_data['parameters'] = parameters
 
-        logger.info("Injected signal in {}:".format(self.name))
-        logger.info("  optimal SNR = {:.2f}".format(self.meta_data['optimal_SNR']))
-        logger.info("  matched filter SNR = {:.2f}".format(self.meta_data['matched_filter_SNR']))
+        logger.info(f"Injected signal in {self.name}:")
+        logger.info(f"  optimal SNR = {self.meta_data['optimal_SNR']:.2f}")
+        logger.info(f"  matched filter SNR = {self.meta_data['matched_filter_SNR']:.2f}")
         for key in parameters:
-            logger.info('  {} = {}'.format(key, parameters[key]))
+            logger.info(f'  {key} = {parameters[key]}')
 
     @property
     def amplitude_spectral_density_array(self):
@@ -621,11 +615,11 @@ class Interferometer(object):
         """
 
         if label is None:
-            filename_psd = '{}/{}_psd.dat'.format(outdir, self.name)
-            filename_data = '{}/{}_frequency_domain_data.dat'.format(outdir, self.name)
+            filename_psd = f'{outdir}/{self.name}_psd.dat'
+            filename_data = f'{outdir}/{self.name}_frequency_domain_data.dat'
         else:
-            filename_psd = '{}/{}_{}_psd.dat'.format(outdir, self.name, label)
-            filename_data = '{}/{}_{}_frequency_domain_data.dat'.format(outdir, self.name, label)
+            filename_psd = f'{outdir}/{self.name}_{label}_psd.dat'
+            filename_data = f'{outdir}/{self.name}_{label}_frequency_domain_data.dat'
         np.savetxt(filename_data,
                    np.array(
                        [self.strain_data.frequency_array,
@@ -669,11 +663,10 @@ class Interferometer(object):
         fig.tight_layout()
         if label is None:
             fig.savefig(
-                '{}/{}_frequency_domain_data.png'.format(outdir, self.name))
+                f'{outdir}/{self.name}_frequency_domain_data.png')
         else:
             fig.savefig(
-                '{}/{}_{}_frequency_domain_data.png'.format(
-                    outdir, self.name, label))
+                f'{outdir}/{self.name}_{label}_frequency_domain_data.png')
         plt.close(fig)
 
     def plot_time_domain_data(
@@ -725,7 +718,7 @@ class Interferometer(object):
 
         if t0:
             x = self.strain_data.time_array - t0
-            xlabel = 'GPS time [s] - {}'.format(t0)
+            xlabel = f'GPS time [s] - {t0}'
         else:
             x = self.strain_data.time_array
             xlabel = 'GPS time [s]'
@@ -741,10 +734,10 @@ class Interferometer(object):
 
         if label is None:
             fig.savefig(
-                '{}/{}_time_domain_data.png'.format(outdir, self.name))
+                f'{outdir}/{self.name}_time_domain_data.png')
         else:
             fig.savefig(
-                '{}/{}_{}_time_domain_data.png'.format(outdir, self.name, label))
+                f'{outdir}/{self.name}_{label}_time_domain_data.png')
         plt.close(fig)
 
     @staticmethod

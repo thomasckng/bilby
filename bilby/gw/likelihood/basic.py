@@ -30,8 +30,8 @@ class BasicGravitationalWaveTransient(Likelihood):
         self.waveform_generator = waveform_generator
 
     def __repr__(self):
-        return self.__class__.__name__ + '(interferometers={},\n\twaveform_generator={})' \
-            .format(self.interferometers, self.waveform_generator)
+        from ...core.utils.io import _generic_class_repr
+        _generic_class_repr(self)
 
     def noise_log_likelihood(self):
         """ Calculates the real part of noise log-likelihood

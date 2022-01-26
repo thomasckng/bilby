@@ -29,9 +29,9 @@ def grid_file_name(outdir, label, gzip=False):
     str: File name of the output file
     """
     if gzip:
-        return os.path.join(outdir, '{}_grid.json.gz'.format(label))
+        return os.path.join(outdir, f'{label}_grid.json.gz')
     else:
-        return os.path.join(outdir, '{}_grid.json'.format(label))
+        return os.path.join(outdir, f'{label}_grid.json')
 
 
 class Grid(object):
@@ -179,8 +179,7 @@ class Grid(object):
         """
 
         if name not in self.parameter_names:
-            raise ValueError("'{}' is not a recognised "
-                             "parameter".format(name))
+            raise ValueError(f"'{name}' is not a recognised parameter")
 
         if non_marg_names is None:
             non_marg_names = list(self.parameter_names)
@@ -357,7 +356,7 @@ class Grid(object):
             try:
                 dictionary[attr] = getattr(self, attr)
             except ValueError as e:
-                logger.debug("Unable to save {}, message: {}".format(attr, e))
+                logger.debug(f"Unable to save {attr}, message: {e}")
                 pass
         return dictionary
 
@@ -415,7 +414,7 @@ class Grid(object):
                     json.dump(dictionary, file, indent=2, cls=BilbyJsonEncoder)
         except Exception as e:
             logger.error("\n\n Saving the data has failed with the "
-                         "following message:\n {} \n\n".format(e))
+                         f"following message:\n {e} \n\n")
 
     @classmethod
     def read(cls, filename=None, outdir=None, label=None, gzip=False):
@@ -462,6 +461,6 @@ class Grid(object):
 
                 return grid
             except TypeError as e:
-                raise IOError("Unable to load dictionary, error={}".format(e))
+                raise IOError(f"Unable to load dictionary, error={e}")
         else:
-            raise IOError("No result '{}' found".format(filename))
+            raise IOError(f"No result '{filename}' found")

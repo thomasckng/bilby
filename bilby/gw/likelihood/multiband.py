@@ -173,8 +173,10 @@ class MBGravitationalWaveTransient(GravitationalWaveTransient):
             )
         else:
             self._time_offset = 2.12
-            logger.warning("time offset can not be inferred. Use the standard time offset of {} seconds.".format(
-                self._time_offset))
+            logger.warning(
+                f"time offset can not be inferred. Use the standard time "
+                f"offset of {self.time_offset} seconds."
+            )
 
     @property
     def delta_f_end(self):
@@ -207,8 +209,10 @@ class MBGravitationalWaveTransient(GravitationalWaveTransient):
             )
         else:
             self._delta_f_end = 53.
-            logger.warning("delta_f_end can not be inferred. Use the standard delta_f_end of {} Hz.".format(
-                self._delta_f_end))
+            logger.warning(
+                f"delta_f_end can not be inferred. Use the standard "
+                f"delta_f_end of {self._delta_f_end} Hz."
+            )
 
     @property
     def maximum_banding_frequency(self):
@@ -233,7 +237,7 @@ class MBGravitationalWaveTransient(GravitationalWaveTransient):
                     fmax_tmp = maximum_banding_frequency
                 else:
                     logger.warning("The input maximum_banding_frequency is too large."
-                                   "It is set to be {} Hz.".format(fmax_tmp))
+                                   f"It is set to be {fmax_tmp} Hz.")
             else:
                 raise TypeError("maximum_banding_frequency must be a number")
         self._maximum_banding_frequency = fmax_tmp
@@ -362,8 +366,11 @@ class MBGravitationalWaveTransient(GravitationalWaveTransient):
             else:
                 break
         self.fb_dfb.append((self.maximum_frequency + self.delta_f_end, self.delta_f_end))
-        logger.info("The total frequency range is divided into {} bands with frequency intervals of {}.".format(
-            len(self.durations), ", ".join(["1/{} Hz".format(d) for d in self.durations])))
+        intervals = ", ".join([f"1/{d} Hz" for d in self.durations])
+        logger.info(
+            f"The total frequency range is divided into {len(self.durations)} "
+            f"bands with frequency intervals of {intervals}."
+        )
 
     def _setup_integers(self):
         """Set up integers needed for likelihood evaluations. This sets the following instance variables.
@@ -409,11 +416,13 @@ class MBGravitationalWaveTransient(GravitationalWaveTransient):
         unique_frequencies, idxs = np.unique(self.banded_frequency_points, return_inverse=True)
         self.waveform_generator.waveform_arguments['frequencies'] = unique_frequencies
         self.unique_to_original_frequencies = idxs
-        logger.info("The number of frequency points where waveforms are evaluated is {}.".format(
-            len(unique_frequencies)))
-        logger.info("The speed-up gain of multi-banding is {}.".format(
-            (self.maximum_frequency - self.minimum_frequency) * self.interferometers.duration /
-            len(unique_frequencies)))
+        logger.info(f"The number of frequency points where waveforms are evaluated is {len(unique_frequencies)}.")
+        theoretical_speed_up = (
+            (self.maximum_frequency - self.minimum_frequency)
+            * self.interferometers.duration
+            / len(unique_frequencies)
+        )
+        logger.info(f"The speed-up gain of multi-banding is {theoretical_speed_up}.")
 
     def _window(self, f, b):
         """Compute window function in the b-th band
@@ -450,7 +459,7 @@ class MBGravitationalWaveTransient(GravitationalWaveTransient):
         self.linear_coeffs = dict((ifo.name, np.array([])) for ifo in self.interferometers)
         N = self.Nbs[-1]
         for ifo in self.interferometers:
-            logger.info("Pre-computing linear coefficients for {}".format(ifo.name))
+            logger.info(f"Pre-computing linear coefficients for {ifo.name}")
             fddata = np.zeros(N // 2 + 1, dtype=complex)
             fddata[:len(ifo.frequency_domain_strain)][ifo.frequency_mask] += \
                 ifo.frequency_domain_strain[ifo.frequency_mask] / ifo.power_spectral_density_array[ifo.frequency_mask]
@@ -472,7 +481,7 @@ class MBGravitationalWaveTransient(GravitationalWaveTransient):
         self.quadratic_coeffs = dict((ifo.name, np.array([])) for ifo in self.interferometers)
         N = self.Nbs[-1]
         for ifo in self.interferometers:
-            logger.info("Pre-computing quadratic coefficients for {}".format(ifo.name))
+            logger.info(f"Pre-computing quadratic coefficients for {ifo.name}")
             full_frequencies = np.arange(N // 2 + 1) / ifo.duration
             full_inv_psds = np.zeros(N // 2 + 1)
             full_inv_psds[:len(ifo.power_spectral_density_array)][ifo.frequency_mask] = \
@@ -515,7 +524,7 @@ class MBGravitationalWaveTransient(GravitationalWaveTransient):
         self.hbcs = dict((ifo.name, []) for ifo in self.interferometers)
         self.wths = dict((ifo.name, []) for ifo in self.interferometers)
         for ifo in self.interferometers:
-            logger.info("Pre-computing quadratic coefficients for {}".format(ifo.name))
+            logger.info(f"Pre-computing quadratic coefficients for {ifo.name}")
             full_inv_psds = np.zeros(N // 2 + 1)
             full_inv_psds[:len(ifo.power_spectral_density_array)][ifo.frequency_mask] = (
                 1 / ifo.power_spectral_density_array[ifo.frequency_mask]
@@ -567,7 +576,7 @@ class MBGravitationalWaveTransient(GravitationalWaveTransient):
         ifo_time = dt_geocent + dt
 
         calib_factor = interferometer.calibration_model.get_calibration_factor(
-            self.banded_frequency_points, prefix='recalib_{}_'.format(interferometer.name), **self.parameters)
+            self.banded_frequency_points, prefix=f'recalib_{interferometer.name}_', **self.parameters)
 
         strain *= np.exp(-1j * 2. * np.pi * self.banded_frequency_points * ifo_time)
         strain *= np.conjugate(calib_factor)

@@ -143,11 +143,9 @@ def _check_legal_sampling_frequency_and_duration(sampling_frequency, duration):
     if np.abs(num - np.round(num)) > 10**(-_TOL):
         raise IllegalDurationAndSamplingFrequencyException(
             '\nYour sampling frequency and duration must multiply to a number'
-            'up to (tol = {}) decimals close to an integer number. '
-            '\nBut sampling_frequency={} and  duration={} multiply to {}'.format(
-                _TOL, sampling_frequency, duration,
-                sampling_frequency * duration
-            )
+            f'up to (tol = {_TOL}) decimals close to an integer number. '
+            f'\nBut sampling_frequency={sampling_frequency} and '
+            f'duration={duration} multiply to {sampling_frequency * duration}'
         )
 
 

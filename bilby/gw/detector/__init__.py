@@ -57,8 +57,8 @@ def inject_signal_into_gwpy_timeseries(
         A dictionary of meta data about the injection
 
     """
-    from gwpy.timeseries import TimeSeries
     from gwpy.plot import Plot
+    from gwpy.timeseries import TimeSeries
 
     ifo = get_empty_interferometer(det)
 
@@ -67,7 +67,7 @@ def inject_signal_into_gwpy_timeseries(
     elif power_spectral_density is not None:
         raise TypeError(
             "Input power_spectral_density should be bilby.gw.detector.psd.PowerSpectralDensity "
-            "object or None, received {}.".format(type(power_spectral_density))
+            f"object or None, received {type(power_spectral_density)}."
         )
 
     ifo.strain_data.set_from_gwpy_timeseries(data)
@@ -78,8 +78,9 @@ def inject_signal_into_gwpy_timeseries(
     safe_time = get_safe_signal_duration(**parameters_check)
     if data.duration.value < safe_time:
         ValueError(
-            "Injecting a signal with safe-duration {} longer than the data {}"
-            .format(safe_time, data.duration.value))
+            f"Injecting a signal with safe-duration {safe_time} "
+            f"longer than the data {data.duration.value}"
+        )
 
     waveform_polarizations = waveform_generator.time_domain_strain(parameters)
 
@@ -103,8 +104,7 @@ def inject_signal_into_gwpy_timeseries(
 
     if outdir is not None and label is not None:
         fig = Plot(signal_shifted)
-        fig.savefig('{}/{}_{}_time_domain_injected_signal'.format(
-            outdir, ifo.name, label))
+        fig.savefig(f'{outdir}/{ifo.name}_{label}_time_domain_injected_signal')
 
     meta_data = dict()
     frequency_domain_signal, _ = utils.nfft(signal, waveform_generator.sampling_frequency)
@@ -114,11 +114,11 @@ def inject_signal_into_gwpy_timeseries(
         ifo.matched_filter_snr(signal=frequency_domain_signal))
     meta_data['parameters'] = parameters
 
-    logger.info("Injected signal in {}:".format(ifo.name))
-    logger.info("  optimal SNR = {:.2f}".format(meta_data['optimal_SNR']))
-    logger.info("  matched filter SNR = {:.2f}".format(meta_data['matched_filter_SNR']))
+    logger.info(f"Injected signal in {ifo.name}:")
+    logger.info(f"  optimal SNR = {meta_data['optimal_SNR']:.2f}")
+    logger.info(f"  matched filter SNR = {meta_data['matched_filter_SNR']:.2f}")
     for key in parameters:
-        logger.info('  {} = {}'.format(key, parameters[key]))
+        logger.info(f'  {key} = {parameters[key]}')
 
     return signal_and_data, meta_data
 
@@ -258,7 +258,7 @@ def load_data_from_cache_file(
                 (cache.segment[0].gpsSeconds < psd_start_time) &
                 (cache.segment[1].gpsSeconds > psd_start_time + psd_duration))
             ifo = get_empty_interferometer(
-                "{}1".format(cache.observatory))
+                f"{cache.observatory}1")
             if not data_in_cache:
                 raise ValueError('The specified data segment does not exist in' 
                                  ' this frame.')
@@ -291,9 +291,9 @@ def load_data_from_cache_file(
     if data_set and psd_set:
         return ifo
     elif not data_set:
-        raise ValueError('Data not loaded for {}'.format(ifo.name))
+        raise ValueError(f'Data not loaded for {ifo.name}')
     elif not psd_set:
-        raise ValueError('PSD not created for {}'.format(ifo.name))
+        raise ValueError(f'PSD not created for {ifo.name}')
 
 
 def load_data_by_channel_name(

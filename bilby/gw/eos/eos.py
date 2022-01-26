@@ -429,16 +429,13 @@ class TabularEOS(object):
 
         # Ensure valid units
         if xunits not in list(conversion_dict[xname].keys()) or yunits not in list(conversion_dict[yname].keys()):
-            s = '''
+            s = f'''
                 Invalid unit system. Valid variable-unit pairs are:
-                p: {p_units}
-                e: {e_units}
-                rho: {rho_units}
-                h: {h_units}.
-                '''.format(p_units=list(conversion_dict['pressure'].keys()),
-                           e_units=list(conversion_dict['energy_density'].keys()),
-                           rho_units=list(conversion_dict['density'].keys()),
-                           h_units=list(conversion_dict['pseudo_enthalpy'].keys()))
+                p: {list(conversion_dict['pressure'].keys())}
+                e: {list(conversion_dict['energy_density'].keys())}
+                rho: {list(conversion_dict['density'].keys())}
+                h: {list(conversion_dict['pseudo_enthalpy'].keys())}.
+                '''
             raise ValueError(s)
 
         xdat = rep_dict[xname][0] * conversion_dict[xname][xunits]
@@ -808,14 +805,12 @@ class EOSFamily(object):
 
         # Ensure valid units
         if xunits not in list(conversion_dict[xname].keys()) or yunits not in list(conversion_dict[yname].keys()):
-            s = '''
-                        Invalid unit system. Valid variable-unit pairs are:
-                        m: {m_units}
-                        r: {r_units}
-                        l: {l_units}.
-                        '''.format(m_units=list(conversion_dict['mass'].keys()),
-                                   r_units=list(conversion_dict['radius'].keys()),
-                                   l_units=list(conversion_dict['tidal_deformability'].keys()))
+            s = f'''
+            Invalid unit system. Valid variable-unit pairs are:
+            m: {list(conversion_dict['mass'].keys())}
+            r: {list(conversion_dict['radius'].keys())}
+            l: {list(conversion_dict['tidal_deformability'].keys())}.
+            '''
             raise ValueError(s)
 
         xdat = rep_dict[varnames[1]][0] * conversion_dict[xname][xunits]

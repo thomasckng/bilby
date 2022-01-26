@@ -133,7 +133,7 @@ def get_polarization_tensor(ra, dec, time, psi, mode):
     elif mode.lower() == 'y':
         return np.einsum('i,j->ij', n, omega) + np.einsum('i,j->ij', omega, n)
     else:
-        raise ValueError("{} not a polarization mode!".format(mode))
+        raise ValueError(f"{mode} not a polarization mode!")
 
 
 def get_vertex_position_geocentric(latitude, longitude, elevation):
@@ -444,7 +444,7 @@ def get_open_strain_data(
 
     """
     from gwpy.timeseries import TimeSeries
-    filename = '{}/{}_{}_{}.txt'.format(outdir, name, start_time, end_time)
+    filename = f'{outdir}/{name}_{start_time}_{end_time}.txt'
 
     if buffer_time < 0:
         raise ValueError("buffer_time < 0")
@@ -452,19 +452,17 @@ def get_open_strain_data(
     end_time = end_time + buffer_time
 
     if os.path.isfile(filename) and cache:
-        logger.info('Using cached data from {}'.format(filename))
+        logger.info(f'Using cached data from {filename}')
         strain = TimeSeries.read(filename)
     else:
-        logger.info('Fetching open data from {} to {} with buffer time {}'
-                    .format(start_time, end_time, buffer_time))
+        logger.info(f'Fetching open data from {start_time} to {end_time} with buffer time {buffer_time}')
         try:
             strain = TimeSeries.fetch_open_data(name, start_time, end_time, **kwargs)
-            logger.info('Saving cache of data to {}'.format(filename))
+            logger.info(f'Saving cache of data to {filename}')
             strain.write(filename)
         except Exception as e:
             logger.info("Unable to fetch open data, see debug for detailed info")
-            logger.info("Call to gwpy.timeseries.TimeSeries.fetch_open_data returned {}"
-                        .format(e))
+            logger.info(f"Call to gwpy.timeseries.TimeSeries.fetch_open_data returned {e}")
             strain = None
 
     return strain
@@ -503,9 +501,9 @@ def read_frame_file(file_name, start_time, end_time, channel=None, buffer_time=0
         try:
             strain = TimeSeries.read(source=file_name, channel=channel, start=start_time, end=end_time, **kwargs)
             loaded = True
-            logger.info('Successfully loaded {}.'.format(channel))
+            logger.info(f'Successfully loaded {channel}.')
         except RuntimeError:
-            logger.warning('Channel {} not found. Trying preset channel names'.format(channel))
+            logger.warning(f'Channel {channel} not found. Trying preset channel names')
 
     if loaded is False:
         ligo_channel_types = ['GDS-CALIB_STRAIN', 'DCS-CALIB_STRAIN_C01', 'DCS-CALIB_STRAIN_C02',
@@ -518,12 +516,12 @@ def read_frame_file(file_name, start_time, end_time, channel=None, buffer_time=0
             for channel_type in channel_types[detector]:
                 if loaded:
                     break
-                channel = '{}:{}'.format(detector, channel_type)
+                channel = f'{detector}:{channel_type}'
                 try:
                     strain = TimeSeries.read(source=file_name, channel=channel, start=start_time, end=end_time,
                                              **kwargs)
                     loaded = True
-                    logger.info('Successfully read strain data for channel {}.'.format(channel))
+                    logger.info(f'Successfully read strain data for channel {channel}.')
                 except RuntimeError:
                     pass
 
@@ -566,11 +564,11 @@ def gracedb_to_json(gracedb, cred=None, service_url='https://gracedb.ligo.org/ap
         If given, a string identfying the location in which to store the json
     """
     logger.info(
-        'Starting routine to download GraceDb candidate {}'.format(gracedb))
+        f'Starting routine to download GraceDb candidate {gracedb}')
     from ligo.gracedb.rest import GraceDb
 
     logger.info('Initialise client and attempt to download')
-    logger.info('Fetching from {}'.format(service_url))
+    logger.info(f'Fetching from {service_url}')
     try:
         client = GraceDb(cred=cred, service_url=service_url)
     except IOError:
@@ -581,14 +579,14 @@ def gracedb_to_json(gracedb, cred=None, service_url='https://gracedb.ligo.org/ap
         candidate = client.event(gracedb)
         logger.info('Successfully downloaded candidate')
     except Exception as e:
-        raise ValueError("Unable to obtain GraceDB candidate, exception: {}".format(e))
+        raise ValueError(f"Unable to obtain GraceDB candidate, exception: {e}")
 
     json_output = candidate.json()
 
     if outdir is not None:
         check_directory_exists_and_if_not_mkdir(outdir)
-        outfilepath = os.path.join(outdir, '{}.json'.format(gracedb))
-        logger.info('Writing candidate to {}'.format(outfilepath))
+        outfilepath = os.path.join(outdir, f'{gracedb}.json')
+        logger.info(f'Writing candidate to {outfilepath}')
         with open(outfilepath, 'w') as outfile:
             json.dump(json_output, outfile, indent=2)
 
@@ -630,12 +628,11 @@ def gw_data_find(observatory, gps_start_time, duration, calibration,
         if observatory_code == 'V':
             query_type = 'V1Online'
         else:
-            query_type = '{}_HOFT_C0{}'.format(observatory, calibration)
+            query_type = f'{observatory}_HOFT_C0{calibration}'
 
-    logger.info('Using LDRDataFind query type {}'.format(query_type))
+    logger.info(f'Using LDRDataFind query type {query_type}')
 
-    cache_file = '{}-{}_CACHE-{}-{}.lcf'.format(
-        observatory, query_type, gps_start_time, duration)
+    cache_file = f'{observatory}-{query_type}_CACHE-{gps_start_time}-{duration}.lcf'
     output_cache_file = os.path.join(outdir, cache_file)
 
     gps_end_time = gps_start_time + duration
@@ -648,12 +645,12 @@ def gw_data_find(observatory, gps_start_time, duration, calibration,
             server = 'ldr.ldas.cit:80'
 
     cl_list = ['gw_data_find']
-    cl_list.append('--observatory {}'.format(observatory_code))
-    cl_list.append('--gps-start-time {}'.format(int(np.floor(gps_start_time))))
-    cl_list.append('--gps-end-time {}'.format(int(np.ceil(gps_end_time))))
-    cl_list.append('--type {}'.format(query_type))
-    cl_list.append('--output {}'.format(output_cache_file))
-    cl_list.append('--server {}'.format(server))
+    cl_list.append(f'--observatory {observatory_code}')
+    cl_list.append(f'--gps-start-time {int(np.floor(gps_start_time))}')
+    cl_list.append(f'--gps-end-time {int(np.ceil(gps_end_time))}')
+    cl_list.append(f'--type {query_type}')
+    cl_list.append(f'--output {output_cache_file}')
+    cl_list.append(f'--server {server}')
     cl_list.append('--url-type file')
     cl_list.append('--lal-cache')
     cl = ' '.join(cl_list)

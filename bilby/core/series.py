@@ -24,8 +24,7 @@ class CoupledTimeAndFrequencySeries(object):
         self._time_array = None
 
     def __repr__(self):
-        return self.__class__.__name__ + '(duration={}, sampling_frequency={}, start_time={})'\
-            .format(self.duration, self.sampling_frequency, self.start_time)
+        return utils.io._generic_class_repr(self)
 
     @property
     def frequency_array(self):
@@ -41,9 +40,11 @@ class CoupledTimeAndFrequencySeries(object):
                     sampling_frequency=self.sampling_frequency,
                     duration=self.duration)
             else:
-                raise ValueError('Can not calculate a frequency series without a '
-                                 'legitimate sampling_frequency ({}) or duration ({})'
-                                 .format(self.sampling_frequency, self.duration))
+                raise ValueError(
+                    'Can not calculate a frequency series without a '
+                    f'legitimate sampling_frequency ({self.sampling_frequency})'
+                    f' or duration ({self.duration}).'
+                )
 
             self._frequency_array_updated = True
         return self._frequency_array
@@ -71,9 +72,11 @@ class CoupledTimeAndFrequencySeries(object):
                     duration=self.duration,
                     starting_time=self.start_time)
             else:
-                raise ValueError('Can not calculate a time series without a '
-                                 'legitimate sampling_frequency ({}) or duration ({})'
-                                 .format(self.sampling_frequency, self.duration))
+                raise ValueError(
+                    'Can not calculate a time series without a '
+                    f'legitimate sampling_frequency ({self.sampling_frequency})'
+                    f' or duration ({self.duration}).'
+                )
 
             self._time_array_updated = True
         return self._time_array

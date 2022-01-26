@@ -56,17 +56,11 @@ class InterferometerList(list):
             try:
                 if not all(y == x[0] for y in x):
                     ifo_strs = [
-                        "{ifo}[{attribute}]={value}".format(
-                            ifo=ifo.name,
-                            attribute=attribute,
-                            value=getattr(ifo.strain_data, attribute),
-                        )
+                        f"{ifo.name}[{attribute}]={getattr(ifo.strain_data, attribute)}"
                         for ifo in self
                     ]
                     raise ValueError(
-                        "The {} of all interferometers are not the same: {}".format(
-                            attribute, ", ".join(ifo_strs)
-                        )
+                        f"The {attribute} of all interferometers are not the same: {', '.join(ifo_strs)}"
                     )
             except ValueError as e:
                 if not all(math.isclose(y, x[0], abs_tol=1e-5) for y in x):
@@ -370,7 +364,7 @@ class TriangularInterferometer(InterferometerList):
         for ii in range(3):
             self.append(
                 Interferometer(
-                    "{}{}".format(name, ii + 1),
+                    f"{name}{ii + 1}",
                     power_spectral_density[ii],
                     minimum_frequency[ii],
                     maximum_frequency[ii],
@@ -441,12 +435,12 @@ def get_empty_interferometer(name):
         Interferometer instance
     """
     filename = os.path.join(
-        os.path.dirname(__file__), "detectors", "{}.interferometer".format(name)
+        os.path.dirname(__file__), "detectors", f"{name}.interferometer"
     )
     try:
         return load_interferometer(filename)
     except OSError:
-        raise ValueError("Interferometer {} not implemented".format(name))
+        raise ValueError(f"Interferometer {name} not implemented")
 
 
 def load_interferometer(filename):
@@ -463,7 +457,7 @@ def load_interferometer(filename):
             parameters[key] = value
     if "shape" not in parameters.keys():
         ifo = Interferometer(**parameters)
-        logger.debug("Assuming L shape for {}".format("name"))
+        logger.debug("Assuming L shape for name")
     elif parameters["shape"].lower() in ["l", "ligo"]:
         parameters.pop("shape")
         ifo = Interferometer(**parameters)
@@ -472,6 +466,6 @@ def load_interferometer(filename):
         ifo = TriangularInterferometer(**parameters)
     else:
         raise IOError(
-            "{} could not be loaded. Invalid parameter 'shape'.".format(filename)
+            f"{filename} could not be loaded. Invalid parameter 'shape'."
         )
     return ifo

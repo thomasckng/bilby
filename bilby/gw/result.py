@@ -27,7 +27,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
             return item
         except KeyError:
             raise AttributeError(
-                "No information stored for {}".format('/'.join(keys)))
+                f"No information stored for {'/'.join(keys)}")
 
     @property
     def sampling_frequency(self):
@@ -129,7 +129,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
             return self.__get_from_nested_meta_data(
                 'likelihood', 'interferometers', detector)
         except AttributeError:
-            logger.info("No injection for detector {}".format(detector))
+            logger.info(f"No injection for detector {detector}")
             return None
 
     @latex_plot_format
@@ -174,28 +174,32 @@ class CompactBinaryCoalescenceResult(CoreResult):
 
             # Assume spline control frequencies are constant
             freq_params = np.sort([param for param in parameters if
-                                   'recalib_{0}_frequency_'.format(ifo) in param])
+                                   f'recalib_{ifo}_frequency_' in param])
 
             logfreqs = np.log([posterior[param].iloc[0] for param in freq_params])
 
             # Amplitude calibration model
             plt.sca(ax1)
             amp_params = np.sort([param for param in parameters if
-                                  'recalib_{0}_amplitude_'.format(ifo) in param])
+                                  f'recalib_{ifo}_amplitude_' in param])
             if len(amp_params) > 0:
                 amplitude = 100 * np.column_stack([posterior[param] for param in amp_params])
-                plot_spline_pos(logfreqs, amplitude, color=color, level=level,
-                                label=r"{0} (mean, {1}$\%$)".format(ifo.upper(), int(level * 100)))
+                plot_spline_pos(
+                    logfreqs, amplitude, color=color, level=level,
+                    label=f"{ifo.upper()} (mean, {int(level * 100)}$\\%$)"
+                )
 
             # Phase calibration model
             plt.sca(ax2)
             phase_params = np.sort([param for param in parameters if
-                                    'recalib_{0}_phase_'.format(ifo) in param])
+                                    f'recalib_{ifo}_phase_' in param])
             if len(phase_params) > 0:
                 phase = np.column_stack([posterior[param] for param in phase_params])
-                plot_spline_pos(logfreqs, phase, color=color, level=level,
-                                label=r"{0} (mean, {1}$\%$)".format(ifo.upper(), int(level * 100)),
-                                xform=spline_angle_xform)
+                plot_spline_pos(
+                    logfreqs, phase, color=color, level=level,
+                    label=f"{ifo.upper} (mean, {int(level * 100)}$\\%$)",
+                    xform=spline_angle_xform
+                )
 
         ax1.tick_params(labelsize=.75 * font_size)
         ax2.tick_params(labelsize=.75 * font_size)
@@ -213,7 +217,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
             fig=fig, filename=filename,
             format=format, dpi=600, bbox_inches='tight'
         )
-        logger.debug("Calibration figure saved to {}".format(filename))
+        logger.debug(f"Calibration figure saved to {filename}")
         plt.close()
 
     def plot_waveform_posterior(
@@ -330,17 +334,14 @@ class CompactBinaryCoalescenceResult(CoreResult):
                 'interferometer must be either str or Interferometer')
         else:
             PLOT_DATA = True
-        logger.info("Generating waveform figure for {}".format(
-            interferometer.name))
+        logger.info(f"Generating waveform figure for {interferometer.name}")
 
         if n_samples is None:
             samples = self.posterior
         elif n_samples > len(self.posterior):
             logger.debug(
-                "Requested more waveform samples ({}) than we have "
-                "posterior samples ({})!".format(
-                    n_samples, len(self.posterior)
-                )
+                f"Requested more waveform samples ({n_samples}) than we have "
+                f"posterior samples ({len(self.posterior)})!"
             )
             samples = self.posterior
         else:
@@ -360,13 +361,9 @@ class CompactBinaryCoalescenceResult(CoreResult):
             (interferometer.time_array <= end_time)
         )
         frequency_idxs = np.where(interferometer.frequency_mask)[0]
-        logger.debug("Frequency mask contains {} values".format(
-            len(frequency_idxs))
-        )
+        logger.debug(f"Frequency mask contains {len(frequency_idxs)} values")
         frequency_idxs = frequency_idxs[::max(1, len(frequency_idxs) // 4000)]
-        logger.debug("Downsampling frequency mask to {} values".format(
-            len(frequency_idxs))
-        )
+        logger.debug(f"Downsampling frequency mask to {len(frequency_idxs)} values")
         plot_times = interferometer.time_array[time_idxs]
         plot_times -= interferometer.strain_data.start_time
         start_time -= interferometer.strain_data.start_time
@@ -490,9 +487,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
         upper_percentile = delta * 100
         lower_percentile = (1 - delta) * 100
         logger.debug(
-            'Plotting posterior between the {} and {} percentiles'.format(
-                lower_percentile, upper_percentile
-            )
+            f'Plotting posterior between the {lower_percentile} and {upper_percentile} percentiles'
         )
 
         if format == "html":
@@ -515,7 +510,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
                     mode='lines',
                     line_color=WAVEFORM_COLOR,
                     opacity=0.1,
-                    name="{:.2f}% credible interval".format(upper_percentile - lower_percentile),
+                    name=f"{upper_percentile - lower_percentile:.2f}% credible interval",
                     legendgroup='uncertainty',
                 ),
                 row=1,
@@ -528,7 +523,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
                     mode='lines',
                     line_color=WAVEFORM_COLOR,
                     opacity=0.1,
-                    name="{:.2f}% credible interval".format(upper_percentile - lower_percentile),
+                    name=f"{upper_percentile - lower_percentile:.2f}% credible interval",
                     legendgroup='uncertainty',
                     showlegend=False,
                 ),
@@ -555,7 +550,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
                     mode='lines',
                     line_color=WAVEFORM_COLOR,
                     opacity=0.1,
-                    name="{:.2f}% credible interval".format(upper_percentile - lower_percentile),
+                    name=f"{upper_percentile - lower_percentile:.2f}% credible interval",
                     legendgroup='uncertainty',
                     showlegend=False,
                 ),
@@ -569,7 +564,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
                     mode='lines',
                     line_color=WAVEFORM_COLOR,
                     opacity=0.1,
-                    name="{:.2f}% credible interval".format(upper_percentile - lower_percentile),
+                    name=f"{upper_percentile - lower_percentile:.2f}% credible interval",
                     legendgroup='uncertainty',
                     showlegend=False,
                 ),
@@ -585,8 +580,8 @@ class CompactBinaryCoalescenceResult(CoreResult):
                 plot_frequencies,
                 np.percentile(fd_waveforms, lower_percentile, axis=0),
                 np.percentile(fd_waveforms, upper_percentile, axis=0),
-                color=WAVEFORM_COLOR, label=r'{}\% credible interval'.format(
-                    int(upper_percentile - lower_percentile)),
+                color=WAVEFORM_COLOR,
+                label=f'{int(upper_percentile - lower_percentile)}\\% credible interval',
                 alpha=0.3)
             axs[1].plot(
                 plot_times, np.mean(td_waveforms, axis=0),
@@ -649,11 +644,11 @@ class CompactBinaryCoalescenceResult(CoreResult):
                         color=INJECTION_COLOR, linestyle=':')
                 logger.debug('Plotted injection.')
             except IndexError as e:
-                logger.info('Failed to plot injection with message {}.'.format(e))
+                logger.info(f'Failed to plot injection with message {e}.')
 
         f_domain_x_label = "$f [\\mathrm{Hz}]$"
         f_domain_y_label = "$\\mathrm{ASD} \\left[\\mathrm{Hz}^{-1/2}\\right]$"
-        t_domain_x_label = "$t - {} [s]$".format(interferometer.strain_data.start_time)
+        t_domain_x_label = f"$t - {interferometer.strain_data.start_time} [s]$"
         t_domain_y_label = "Whitened Strain"
         if format == "html":
             fig.update_xaxes(title_text=f_domain_x_label, type="log", row=1)
@@ -674,8 +669,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
         if save:
             filename = os.path.join(
                 self.outdir,
-                self.label + '_{}_waveform.{}'.format(
-                    interferometer.name, format))
+                self.label + f'_{interferometer.name}_waveform.{format}')
             if format == 'html':
                 plot(fig, filename=filename, include_mathjax='cdn', auto_open=False)
             else:
@@ -685,7 +679,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
                     format=format, dpi=600
                 )
                 plt.close()
-            logger.debug("Waveform figure saved to {}".format(filename))
+            logger.debug(f"Waveform figure saved to {filename}")
             rcParams["font.size"] = old_font_size
         else:
             rcParams["font.size"] = old_font_size
@@ -742,7 +736,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
             from ligo.skymap import io, version, plot, postprocess, bayestar, kde
             import healpy as hp
         except ImportError as e:
-            logger.info("Unable to generate skymap: error {}".format(e))
+            logger.info(f"Unable to generate skymap: error {e}")
             return
 
         check_directory_exists_and_if_not_mkdir(self.outdir)
@@ -754,7 +748,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
             logger.info('Taking random subsample of chain')
             data = data.sample(maxpts)
 
-        default_obj_filename = os.path.join(self.outdir, '{}_skypost.obj'.format(self.label))
+        default_obj_filename = os.path.join(self.outdir, f'{self.label}_skypost.obj')
 
         if load_pickle is False:
             try:
@@ -769,7 +763,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
 
             logger.info('Initialising skymap class')
             skypost = confidence_levels(pts, trials=trials, jobs=jobs)
-            logger.info('Pickling skymap to {}'.format(default_obj_filename))
+            logger.info(f'Pickling skymap to {default_obj_filename}')
             with open(default_obj_filename, 'wb') as out:
                 pickle.dump(skypost, out)
 
@@ -778,7 +772,7 @@ class CompactBinaryCoalescenceResult(CoreResult):
                 obj_filename = load_pickle
             else:
                 obj_filename = default_obj_filename
-            logger.info('Reading from pickle {}'.format(obj_filename))
+            logger.info(f'Reading from pickle {obj_filename}')
             with open(obj_filename, 'rb') as file:
                 skypost = pickle.load(file)
             skypost.jobs = jobs
@@ -808,8 +802,8 @@ class CompactBinaryCoalescenceResult(CoreResult):
         except KeyError:
             logger.warning('Cannot determine the event time from geocent_time')
 
-        fits_filename = os.path.join(self.outdir, "{}_skymap.fits".format(self.label))
-        logger.info('Saving skymap fits-file to {}'.format(fits_filename))
+        fits_filename = os.path.join(self.outdir, f"{self.label}_skymap.fits")
+        logger.info(f'Saving skymap fits-file to {fits_filename}')
         io.write_sky_map(fits_filename, hpmap, nest=True)
 
         skymap, metadata = io.fits.read_sky_map(fits_filename, nest=None)
@@ -866,18 +860,18 @@ class CompactBinaryCoalescenceResult(CoreResult):
             except KeyError:
                 pass
             else:
-                text.append('event ID: {}'.format(objid))
+                text.append(f'event ID: {objid}')
             if contour:
                 pp = np.round(contour).astype(int)
                 ii = np.round(np.searchsorted(np.sort(confidence_levels), contour) *
                               deg2perpix).astype(int)
                 for i, p in zip(ii, pp):
                     text.append(
-                        u'{:d}% area: {:d} deg$^2$'.format(p, i))
+                        f'{p:d}% area: {i:d} deg$^2$')
             ax.text(1, 1, '\n'.join(text), transform=ax.transAxes, ha='right')
 
-        filename = os.path.join(self.outdir, "{}_skymap.png".format(self.label))
-        logger.info("Generating 2D projected skymap to {}".format(filename))
+        filename = os.path.join(self.outdir, f"{self.label}_skymap.png")
+        logger.info(f"Generating 2D projected skymap to {filename}")
         safe_save_figure(fig=plt.gcf(), filename=filename, dpi=dpi)
 
 

@@ -263,7 +263,7 @@ class LogUniform(PowerLaw):
         super(LogUniform, self).__init__(name=name, latex_label=latex_label, unit=unit,
                                          minimum=minimum, maximum=maximum, alpha=-1, boundary=boundary)
         if self.minimum <= 0:
-            logger.warning('You specified a uniform-in-log prior with minimum={}'.format(self.minimum))
+            logger.warning(f'You specified a uniform-in-log prior with minimum={self.minimum}')
 
 
 class SymmetricLogUniform(Prior):

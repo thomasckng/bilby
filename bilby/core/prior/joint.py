@@ -131,9 +131,9 @@ class BaseJointPriorDist(object):
         """
         dist_name = self.__class__.__name__
         instantiation_dict = self.get_instantiation_dict()
-        args = ', '.join(['{}={}'.format(key, repr(instantiation_dict[key]))
+        args = ', '.join([f'{key}={repr(instantiation_dict[key])}'
                           for key in instantiation_dict])
-        return "{}({})".format(dist_name, args)
+        return f"{dist_name}({args})"
 
     def prob(self, samp):
         """
@@ -515,8 +515,7 @@ class MultivariateGaussianDist(BaseJointPriorDist):
             self.eigvalues.append(evals)
             self.eigvectors.append(evecs)
         except Exception as e:
-            raise RuntimeError("Problem getting eigenvalues and vectors: "
-                               "{}".format(e))
+            raise RuntimeError(f"Problem getting eigenvalues and vectors: {e}")
 
         # check eigenvalues are positive
         if np.any(self.eigvalues[-1] <= 0.):
@@ -670,7 +669,7 @@ class JointPrior(Prior):
             raise TypeError("Must supply a JointPriorDist object instance to be shared by all joint params")
 
         if name not in dist.names:
-            raise ValueError("'{}' is not a parameter in the JointPriorDist".format(name))
+            raise ValueError(f"'{name}' is not a parameter in the JointPriorDist")
 
         self.dist = dist
         super(JointPrior, self).__init__(name=name, latex_label=latex_label, unit=unit, minimum=dist.bounds[name][0],
@@ -737,9 +736,10 @@ class JointPrior(Prior):
         """
 
         if self.name in self.dist.sampled_parameters:
-            logger.warning("You have already drawn a sample from parameter "
-                           "'{}'. The same sample will be "
-                           "returned".format(self.name))
+            logger.warning(
+                f"You have already drawn a sample from parameter '{self.name}'."
+                " The same sample will be returned."
+            )
 
         if len(self.dist.current_sample) == 0:
             # generate a sample
@@ -804,7 +804,7 @@ class JointPrior(Prior):
                     # check value has a length
                     len(val)
                 except Exception as e:
-                    raise TypeError('Invalid type for ln_prob: {}'.format(e))
+                    raise TypeError(f'Invalid type for ln_prob: {e}')
 
                 if len(val) == 1:
                     return 0.

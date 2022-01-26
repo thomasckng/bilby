@@ -73,11 +73,11 @@ class PowerSpectralDensity(object):
 
     def __repr__(self):
         if self.asd_file is not None or self.psd_file is not None:
-            return self.__class__.__name__ + '(psd_file=\'{}\', asd_file=\'{}\')' \
-                .format(self.psd_file, self.asd_file)
+            args = ["psd_file", "asd_file"]
         else:
-            return self.__class__.__name__ + '(frequency_array={}, psd_array={}, asd_array={})' \
-                .format(self.frequency_array, self.psd_array, self.asd_array)
+            args = ["frequency_array", "psd_array", "asd_array"]
+        kwargs = ", ".join([f"{arg}='{getattr(self, arg)}'" for arg in args])
+        return f"{self.__class__.__name__}({kwargs})"
 
     @staticmethod
     def from_amplitude_spectral_density_file(asd_file):
@@ -227,9 +227,11 @@ class PowerSpectralDensity(object):
 
     def __check_frequency_array_matches_density_array(self, density_array):
         if len(self.frequency_array) != len(density_array):
-            raise ValueError('Provided spectral density does not match frequency array. Not updating.\n'
-                             'Length spectral density {}\n Length frequency array {}\n'
-                             .format(density_array, self.frequency_array))
+            raise ValueError(
+                'Provided spectral density does not match frequency array. Not updating.\n'
+                f'Length spectral density {len(density_array)}\n Length frequency '
+                f'array {len(self.frequency_array)}\n'
+            )
 
     def __interpolate_power_spectral_density(self):
         """Interpolate the loaded power spectral density so it can be resampled
@@ -270,8 +272,8 @@ class PowerSpectralDensity(object):
     def __check_file_was_asd_file(self):
         if min(self.asd_array) < 1e-30:
             logger.warning("You specified an amplitude spectral density file.")
-            logger.warning("{} WARNING {}".format("*" * 30, "*" * 30))
-            logger.warning("The minimum of the provided curve is {:.2e}.".format(min(self.asd_array)))
+            logger.warning(f"{'*' * 30} WARNING {'*' * 30}")
+            logger.warning(f"The minimum of the provided curve is {min(self.asd_array):.2e}.")
             logger.warning("You may have intended to provide this as a power spectral density.")
 
     @property
@@ -289,8 +291,8 @@ class PowerSpectralDensity(object):
     def __check_file_was_psd_file(self):
         if min(self.psd_array) > 1e-30:
             logger.warning("You specified a power spectral density file.")
-            logger.warning("{} WARNING {}".format("*" * 30, "*" * 30))
-            logger.warning("The minimum of the provided curve is {:.2e}.".format(min(self.psd_array)))
+            logger.warning(f"{'*' * 30} WARNING {'*' * 30}")
+            logger.warning(f"The minimum of the provided curve is {min(self.psd_array):.2e}.")
             logger.warning("You may have intended to provide this as an amplitude spectral density.")
 
     @staticmethod
@@ -319,18 +321,17 @@ class PowerSpectralDensity(object):
             logger.debug("PSD file set to None")
             return None
         elif os.path.isfile(file):
-            logger.debug("PSD file {} exists".format(file))
+            logger.debug(f"PSD file {file} exists")
             return file
         else:
             file_in_default_directory = (
                 os.path.join(os.path.dirname(__file__), 'noise_curves', file))
             if os.path.isfile(file_in_default_directory):
-                logger.debug("PSD file {} exists in default dir.".format(file))
+                logger.debug(f"PSD file {file} exists in default dir.")
                 return file_in_default_directory
             else:
                 raise ValueError(
-                    "Unable to locate PSD file {} locally or in the default dir"
-                    .format(file))
+                    f"Unable to locate PSD file {file} locally or in the default dir")
         return file
 
     def __import_amplitude_spectral_density(self):

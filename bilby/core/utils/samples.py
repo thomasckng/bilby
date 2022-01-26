@@ -53,7 +53,7 @@ class SamplesSummary(object):
         if average in allowed_averages:
             self._average = average
         else:
-            raise ValueError("Average {} not in allowed averages".format(average))
+            raise ValueError(f"Average {average} not in allowed averages")
 
     @property
     def median(self):

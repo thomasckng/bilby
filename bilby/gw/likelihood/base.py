@@ -194,12 +194,8 @@ class GravitationalWaveTransient(Likelihood):
             self._marginalized_parameters.append('recalib_index')
 
     def __repr__(self):
-        return self.__class__.__name__ + '(interferometers={},\n\twaveform_generator={},\n\ttime_marginalization={}, ' \
-                                         'distance_marginalization={}, phase_marginalization={}, ' \
-                                         'calibration_marginalization={}, priors={})' \
-            .format(self.interferometers, self.waveform_generator, self.time_marginalization,
-                    self.distance_marginalization, self.phase_marginalization, self.calibration_marginalization,
-                    self.priors)
+        from ...core.utils.io import _generic_class_repr
+        return _generic_class_repr(self)
 
     def _check_set_duration_and_sampling_frequency_of_waveform_generator(self):
         """ Check the waveform_generator has the same duration and
@@ -213,13 +209,13 @@ class GravitationalWaveTransient(Likelihood):
             ifo_attr = getattr(self.interferometers, attribute)
             if wfg_attr is None:
                 logger.debug(
-                    "The waveform_generator {} is None. Setting from the "
-                    "provided interferometers.".format(attribute))
+                    f"The waveform_generator {attribute} is None. Setting from the "
+                    "provided interferometers.")
             elif wfg_attr != ifo_attr:
                 logger.debug(
-                    "The waveform_generator {} is not equal to that of the "
+                    f"The waveform_generator {attribute} is not equal to that of the "
                     "provided interferometers. Overwriting the "
-                    "waveform_generator.".format(attribute))
+                    "waveform_generator.")
             setattr(self.waveform_generator, attribute, ifo_attr)
 
     def calculate_snrs(self, waveform_polarizations, interferometer):
@@ -303,12 +299,12 @@ class GravitationalWaveTransient(Likelihood):
     def _check_marginalized_prior_is_set(self, key):
         if key in self.priors and self.priors[key].is_fixed:
             raise ValueError(
-                "Cannot use marginalized likelihood for {}: prior is fixed".format(key)
+                f"Cannot use marginalized likelihood for {key}: prior is fixed"
             )
         if key not in self.priors or not isinstance(
                 self.priors[key], Prior):
             logger.warning(
-                'Prior not provided for {}, using the BBH default.'.format(key))
+                f'Prior not provided for {key}, using the BBH default.')
             if key == 'geocent_time':
                 self.priors[key] = Uniform(
                     self.interferometers.start_time,
@@ -318,8 +314,8 @@ class GravitationalWaveTransient(Likelihood):
                     if key in self.priors:
                         if not isinstance(self.priors[key], Cosmological):
                             raise TypeError(
-                                "To marginalize over {}, the prior must be specified as a "
-                                "subclass of bilby.gw.prior.Cosmological.".format(key)
+                                f"To marginalize over {key}, the prior must be specified as a "
+                                "subclass of bilby.gw.prior.Cosmological."
                             )
                         self.priors['luminosity_distance'] = self.priors[key].get_corresponding_prior(
                             'luminosity_distance'
@@ -872,15 +868,14 @@ class GravitationalWaveTransient(Likelihood):
                 return None
             match, failure = self._test_cached_lookup_table(loaded_file)
             if match:
-                logger.info('Loaded distance marginalisation lookup table from '
-                            '{}.'.format(filename))
+                logger.info(f'Loaded distance marginalisation lookup table from {filename}')
                 return loaded_file
             else:
-                logger.info('Loaded distance marginalisation lookup table does '
-                            'not match for {}.'.format(failure))
+                logger.info(
+                    f'Loaded distance marginalisation lookup table does not match for {failure}.'
+                )
         elif isinstance(filename, str):
-            logger.info('Distance marginalisation file {} does not '
-                        'exist'.format(filename))
+            logger.info(f'Distance marginalisation file {filename} does not exist')
         return None
 
     def cache_lookup_table(self):
@@ -996,7 +991,7 @@ class GravitationalWaveTransient(Likelihood):
                     self.calibration_draws[interferometer.name][i, :] = \
                         interferometer.calibration_model.get_calibration_factor(
                             interferometer.frequency_array,
-                            prefix='recalib_{}_'.format(interferometer.name),
+                            prefix=f'recalib_{interferometer.name}_',
                             **self.calibration_parameter_draws[interferometer.name].iloc[i])
 
                 calibration.write_calibration_file(
@@ -1046,10 +1041,10 @@ class GravitationalWaveTransient(Likelihood):
         elif isinstance(frame, str):
             self._reference_frame = InterferometerList([frame[:2], frame[2:4]])
         else:
-            raise ValueError("Unable to parse reference frame {}".format(frame))
+            raise ValueError(f"Unable to parse reference frame {frame}")
 
     def get_sky_frame_parameters(self):
-        time = self.parameters['{}_time'.format(self.time_reference)]
+        time = self.parameters[f'{self.time_reference}_time']
         if not self.reference_frame == "sky":
             ra, dec = zenith_azimuth_to_ra_dec(
                 self.parameters['zenith'], self.parameters['azimuth'],
@@ -1070,10 +1065,10 @@ class GravitationalWaveTransient(Likelihood):
         try:
             from lal import git_version, __version__
             lal_version = str(__version__)
-            logger.info("Using lal version {}".format(lal_version))
+            logger.info(f"Using lal version {lal_version}")
             lal_git_version = str(git_version.verbose_msg).replace("\n", ";")
-            logger.info("Using lal git version {}".format(lal_git_version))
-            return "lal_version={}, lal_git_version={}".format(lal_version, lal_git_version)
+            logger.info(f"Using lal git version {lal_git_version}")
+            return f"lal_version={lal_version}, lal_git_version={lal_git_version}"
         except (ImportError, AttributeError):
             return "N/A"
 
@@ -1082,10 +1077,10 @@ class GravitationalWaveTransient(Likelihood):
         try:
             from lalsimulation import git_version, __version__
             lalsim_version = str(__version__)
-            logger.info("Using lalsimulation version {}".format(lalsim_version))
+            logger.info(f"Using lalsimulation version {lalsim_version}")
             lalsim_git_version = str(git_version.verbose_msg).replace("\n", ";")
-            logger.info("Using lalsimulation git version {}".format(lalsim_git_version))
-            return "lalsimulation_version={}, lalsimulation_git_version={}".format(lalsim_version, lalsim_git_version)
+            logger.info(f"Using lalsimulation git version {lalsim_git_version}")
+            return f"lalsimulation_version={lalsim_version}, lalsimulation_git_version={lalsim_git_version}"
         except (ImportError, AttributeError):
             return "N/A"
 

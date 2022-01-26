@@ -117,7 +117,7 @@ def get_dict_with_properties(obj):
 
 def get_function_path(func):
     if hasattr(func, "__module__") and hasattr(func, "__name__"):
-        return "{}.{}".format(func.__module__, func.__name__)
+        return f"{func.__module__}.{func.__name__}"
     else:
         return func
 

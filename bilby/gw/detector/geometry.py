@@ -57,11 +57,8 @@ class InterferometerGeometry(object):
         return True
 
     def __repr__(self):
-        return self.__class__.__name__ + '(length={}, latitude={}, longitude={}, elevation={}, ' \
-                                         'xarm_azimuth={}, yarm_azimuth={}, xarm_tilt={}, yarm_tilt={})' \
-            .format(float(self.length), float(self.latitude), float(self.longitude),
-                    float(self.elevation), float(self.xarm_azimuth), float(self.yarm_azimuth), float(self.xarm_tilt),
-                    float(self.yarm_tilt))
+        from ...core.utils.io import _generic_class_repr
+        return _generic_class_repr(self)
 
     @property
     def latitude(self):

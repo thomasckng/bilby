@@ -427,7 +427,7 @@ class Chain(object):
 
         axes[-1, 1].set_axis_off()
 
-        filename = "{}/{}_checkpoint_trace.png".format(outdir, label)
+        filename = f"{outdir}/{label}_checkpoint_trace.png"
         msg = [
             r"Maximum $\tau$" + f"={self.tau:0.1f} ",
             r"$n_{\rm samples}=$" + f"{self.nsamples} ",

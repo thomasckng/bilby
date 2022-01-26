@@ -109,7 +109,7 @@ class Interped(Prior):
     @minimum.setter
     def minimum(self, minimum):
         if minimum < self.min_limit:
-            raise ValueError('Minimum cannot be set below {}.'.format(round(self.min_limit, 2)))
+            raise ValueError(f'Minimum cannot be set below {round(self.min_limit, 2)}.')
         self._minimum = minimum
         if '_maximum' in self.__dict__ and self._maximum < np.inf:
             self._update_instance()
@@ -132,7 +132,7 @@ class Interped(Prior):
     @maximum.setter
     def maximum(self, maximum):
         if maximum > self.max_limit:
-            raise ValueError('Maximum cannot be set above {}.'.format(round(self.max_limit, 2)))
+            raise ValueError(f'Maximum cannot be set above {round(self.max_limit, 2)}.')
         self._maximum = maximum
         if '_minimum' in self.__dict__ and self._minimum < np.inf:
             self._update_instance()
@@ -164,7 +164,7 @@ class Interped(Prior):
     def _initialize_attributes(self):
         from scipy.integrate import cumtrapz
         if np.trapz(self._yy, self.xx) != 1:
-            logger.debug('Supplied PDF for {} is not normalised, normalising.'.format(self.name))
+            logger.debug(f'Supplied PDF for {self.name} is not normalised, normalising.')
         self._yy /= np.trapz(self._yy, self.xx)
         self.YY = cumtrapz(self._yy, self.xx, initial=0)
         # Need last element of cumulative distribution to be exactly one.
@@ -205,6 +205,6 @@ class FromFile(Interped):
                                            maximum=maximum, name=name, latex_label=latex_label,
                                            unit=unit, boundary=boundary)
         except IOError:
-            logger.warning("Can't load {}.".format(self.file_name))
+            logger.warning(f"Can't load {self.file_name}.")
             logger.warning("Format should be:")
             logger.warning(r"x\tp(x)")

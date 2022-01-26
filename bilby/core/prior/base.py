@@ -38,9 +38,8 @@ class Prior(object):
         """
         if check_range_nonzero and maximum <= minimum:
             raise ValueError(
-                "maximum {} <= minimum {} for {} prior on {}".format(
-                    maximum, minimum, type(self).__name__, name
-                )
+                f"maximum {minimum} <= minimum {maximum} for "
+                f"{self.__class__.__name__} prior on {name}"
             )
         self.name = name
         self.latex_label = latex_label
@@ -215,9 +214,9 @@ class Prior(object):
         """
         prior_name = self.__class__.__name__
         instantiation_dict = self.get_instantiation_dict()
-        args = ', '.join(['{}={}'.format(key, repr(instantiation_dict[key]))
+        args = ', '.join([f'{key}={repr(instantiation_dict[key])}'
                           for key in instantiation_dict])
-        return "{}({})".format(prior_name, args)
+        return f"{prior_name}({args})"
 
     @property
     def _repr_dict(self):
@@ -277,7 +276,7 @@ class Prior(object):
     def latex_label_with_unit(self):
         """ If a unit is specified, returns a string of the latex label and unit """
         if self.unit is not None:
-            return "{} [{}]".format(self.latex_label, self.unit)
+            return f"{self.latex_label} [{self.unit}]"
         else:
             return self.latex_label
 
@@ -313,7 +312,7 @@ class Prior(object):
     @boundary.setter
     def boundary(self, boundary):
         if boundary not in ['periodic', 'reflective', None]:
-            raise ValueError('{} is not a valid setting for prior boundaries'.format(boundary))
+            raise ValueError(f'{boundary} is not a valid setting for prior boundaries')
         self._boundary = boundary
 
     @property
@@ -345,8 +344,7 @@ class Prior(object):
         for key in kwargs:
             val = kwargs[key]
             if key not in subclass_args and not hasattr(cls, "reference_params"):
-                raise AttributeError('Unknown argument {} for class {}'.format(
-                    key, cls.__name__))
+                raise AttributeError(f'Unknown argument {key} for class {cls.__name__}')
             else:
                 kwargs[key] = cls._parse_argument_string(val)
             if key in ["condition_func", "conversion_function"] and isinstance(kwargs[key], str):
@@ -446,8 +444,7 @@ class Prior(object):
                 val = eval(val, dict(), dict(np=np, inf=np.inf, pi=np.pi))
             except NameError:
                 raise TypeError(
-                    "Cannot evaluate prior, "
-                    "failed to parse argument {}".format(val)
+                    f"Cannot evaluate prior, failed to parse argument {val}"
                 )
         return val
 

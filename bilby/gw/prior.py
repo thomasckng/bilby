@@ -50,12 +50,12 @@ def convert_to_flat_in_component_mass_prior(result, fraction=0.25):
     if getattr(result, "priors") is not None:
         for key in ['chirp_mass', 'mass_ratio']:
             if key not in result.priors.keys():
-                BilbyPriorConversionError("{} Prior not found in result object".format(key))
+                BilbyPriorConversionError(f"{key} Prior not found in result object")
             if isinstance(result.priors[key], Constraint):
-                BilbyPriorConversionError("{} Prior should not be a Constraint".format(key))
+                BilbyPriorConversionError(f"{key} Prior should not be a Constraint")
         for key in ['mass_1', 'mass_2']:
             if not isinstance(result.priors[key], Constraint):
-                BilbyPriorConversionError("{} Prior should be a Constraint Prior".format(key))
+                BilbyPriorConversionError(f"{key} Prior should be a Constraint Prior")
     else:
         BilbyPriorConversionError("No prior in the result: unable to convert")
 
@@ -81,10 +81,10 @@ def convert_to_flat_in_component_mass_prior(result, fraction=0.25):
     n_posterior = len(posterior)
     if fraction > effective_sample_size / n_posterior:
         logger.warning(
-            "Sampling posterior of length {} with fraction {}, but "
-            "effective_sample_size / len(posterior) = {}. This may produce "
+            f"Sampling posterior of length {n_posterior} with fraction"
+            f" {fraction}, but effective_sample_size / len(posterior) ="
+            f" {effective_sample_size / n_posterior}. This may produce "
             "biased results"
-            .format(n_posterior, fraction, effective_sample_size / n_posterior)
         )
     result.posterior = posterior.sample(frac=fraction, weights=weights, replace=True)
     result.meta_data["reweighted_to_flat_in_component_mass"] = True
@@ -109,8 +109,9 @@ class Cosmological(Interped):
         self.cosmology = get_cosmology(cosmology)
         if name not in self._default_args_dict:
             raise ValueError(
-                "Name {} not recognised. Must be one of luminosity_distance, "
-                "comoving_distance, redshift".format(name))
+                f"Name {name} not recognised. Must be one of luminosity_distance, "
+                "comoving_distance, redshift"
+            )
         self.name = name
         label_args = self._default_args_dict[self.name]
         if latex_label is not None:
@@ -131,7 +132,7 @@ class Cosmological(Interped):
         elif name == 'luminosity_distance':
             xx, yy = self._get_luminosity_distance_arrays()
         else:
-            raise ValueError('Name {} not recognized.'.format(name))
+            raise ValueError(f'Name {name} not recognized.')
         super(Cosmological, self).__init__(xx=xx, yy=yy, minimum=minimum, maximum=maximum,
                                            boundary=boundary, **label_args)
 
@@ -744,7 +745,7 @@ class BBHPriorDict(CBCPriorDict):
             else:
                 fname = 'precessing_spins_bbh.prior'
             filename = os.path.join(DEFAULT_PRIOR_DIR, fname)
-            logger.info('No prior given, using default BBH priors in {}.'.format(filename))
+            logger.info(f'No prior given, using default BBH priors in {filename}.')
         elif filename is not None:
             if not os.path.isfile(filename):
                 filename = os.path.join(DEFAULT_PRIOR_DIR, filename)
@@ -797,7 +798,7 @@ class BBHPriorDict(CBCPriorDict):
             Whether the key is redundant or not
         """
         if key in self:
-            logger.debug('{} already in prior'.format(key))
+            logger.debug(f'{key} already in prior')
             return True
 
         sampling_parameters = {key for key in self if not isinstance(
@@ -819,9 +820,10 @@ class BBHPriorDict(CBCPriorDict):
                 if len(parameter_set.intersection(
                         sampling_parameters)) >= independent_parameters:
                     logger.disabled = disable_logging
-                    logger.warning('{} already in prior. '
-                                   'This may lead to unexpected behaviour.'
-                                   .format(parameter_set.intersection(self)))
+                    logger.warning(
+                        f'{parameter_set.intersection(self)} already in prior. '
+                        'This may lead to unexpected behaviour.'
+                    )
                     logger.disabled = False
                     return True
         return False
@@ -850,7 +852,7 @@ class BNSPriorDict(CBCPriorDict):
             default_file = 'precessing_spins_bns_tides_on.prior'
         if dictionary is None and filename is None:
             filename = os.path.join(DEFAULT_PRIOR_DIR, default_file)
-            logger.info('No prior given, using default BNS priors in {}.'.format(filename))
+            logger.info(f'No prior given, using default BNS priors in {filename}.')
         elif filename is not None:
             if not os.path.isfile(filename):
                 filename = os.path.join(DEFAULT_PRIOR_DIR, filename)
@@ -906,9 +908,10 @@ class BNSPriorDict(CBCPriorDict):
             if len(tidal_parameters.intersection(sampling_parameters)) > 2:
                 redundant = True
                 logger.disabled = disable_logging
-                logger.warning('{} already in prior. '
-                               'This may lead to unexpected behaviour.'
-                               .format(tidal_parameters.intersection(self)))
+                logger.warning(
+                    f'{tidal_parameters.intersection(self)} already in prior. '
+                    'This may lead to unexpected behaviour.'
+                )
                 logger.disabled = False
             elif len(tidal_parameters.intersection(sampling_parameters)) == 2:
                 redundant = True
@@ -988,9 +991,9 @@ class CalibrationPriorDict(PriorDict):
         """
         PriorDict.to_file(self, outdir=outdir, label=label)
         if self.source is not None:
-            prior_file = os.path.join(outdir, "{}.prior".format(label))
+            prior_file = os.path.join(outdir, f"{label}.prior")
             with open(prior_file, "a") as outfile:
-                outfile.write("# prior source file is {}".format(self.source))
+                outfile.write(f"# prior source file is {self.source}")
 
     @staticmethod
     def from_envelope_file(envelope_file, minimum_frequency,
@@ -1048,22 +1051,22 @@ class CalibrationPriorDict(PriorDict):
 
         prior = CalibrationPriorDict()
         for ii in range(n_nodes):
-            name = "recalib_{}_amplitude_{}".format(label, ii)
-            latex_label = "$A^{}_{}$".format(label, ii)
+            name = f"recalib_{label}_amplitude_{ii}"
+            latex_label = f"$A^{label}_{ii}$"
             prior[name] = Gaussian(mu=amplitude_mean_nodes[ii],
                                    sigma=amplitude_sigma_nodes[ii],
                                    name=name, latex_label=latex_label,
                                    boundary=boundary)
         for ii in range(n_nodes):
-            name = "recalib_{}_phase_{}".format(label, ii)
-            latex_label = r"$\phi^{}_{}$".format(label, ii)
+            name = f"recalib_{label}_phase_{ii}"
+            latex_label = f"$\\phi^{label}_{ii}$"
             prior[name] = Gaussian(mu=phase_mean_nodes[ii],
                                    sigma=phase_sigma_nodes[ii],
                                    name=name, latex_label=latex_label,
                                    boundary=boundary)
         for ii in range(n_nodes):
-            name = "recalib_{}_frequency_{}".format(label, ii)
-            latex_label = "$f^{}_{}$".format(label, ii)
+            name = f"recalib_{label}_frequency_{ii}"
+            latex_label = f"$f^{label}_{ii}$"
             prior[name] = DeltaFunction(peak=np.exp(log_nodes[ii]), name=name,
                                         latex_label=latex_label)
         prior.source = os.path.abspath(envelope_file)
@@ -1109,22 +1112,22 @@ class CalibrationPriorDict(PriorDict):
 
         prior = CalibrationPriorDict()
         for ii in range(n_nodes):
-            name = "recalib_{}_amplitude_{}".format(label, ii)
-            latex_label = "$A^{}_{}$".format(label, ii)
+            name = f"recalib_{label}_amplitude_{ii}"
+            latex_label = f"$A^{label}_{ii}$"
             prior[name] = Gaussian(mu=amplitude_mean_nodes[ii],
                                    sigma=amplitude_sigma_nodes[ii],
                                    name=name, latex_label=latex_label,
                                    boundary='reflective')
         for ii in range(n_nodes):
-            name = "recalib_{}_phase_{}".format(label, ii)
-            latex_label = r"$\phi^{}_{}$".format(label, ii)
+            name = f"recalib_{label}_phase_{ii}"
+            latex_label = f"$\\phi^{label}_{ii}$"
             prior[name] = Gaussian(mu=phase_mean_nodes[ii],
                                    sigma=phase_sigma_nodes[ii],
                                    name=name, latex_label=latex_label,
                                    boundary='reflective')
         for ii in range(n_nodes):
-            name = "recalib_{}_frequency_{}".format(label, ii)
-            latex_label = "$f^{}_{}$".format(label, ii)
+            name = f"recalib_{label}_frequency_{ii}"
+            latex_label = f"$f^{label}_{ii}$"
             prior[name] = DeltaFunction(peak=nodes[ii], name=name,
                                         latex_label=latex_label)
 

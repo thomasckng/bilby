@@ -132,7 +132,7 @@ class InterferometerStrainData(object):
         elif isinstance(notch_list, NotchList):
             self._notch_list = notch_list
         else:
-            raise ValueError("notch_list {} not understood".format(notch_list))
+            raise ValueError(f"notch_list {notch_list} not understood")
         self._frequency_mask_updated = False
 
     @property
@@ -218,8 +218,9 @@ class InterferometerStrainData(object):
         elif self._time_domain_strain is not None:
             logger.info("Generating frequency domain strain from given time "
                         "domain strain.")
-            logger.info("Applying a tukey window with alpha={}, roll off={}".format(
-                self.alpha, self.roll_off))
+            logger.info(
+                f"Applying a tukey window with alpha={self.alpha}, roll off={self.roll_off}"
+            )
             # self.low_pass_filter()
             window = self.time_domain_window()
             self._frequency_domain_strain, self.frequency_array = utils.nfft(
@@ -348,12 +349,12 @@ class InterferometerStrainData(object):
 
         if 2 * filter_freq >= self.sampling_frequency:
             logger.info(
-                "Low pass filter frequency of {}Hz requested, this is equal"
+                f"Low pass filter frequency of {filter_freq}Hz requested, this is equal"
                 " or greater than the Nyquist frequency so no filter applied"
-                .format(filter_freq))
+            )
             return
 
-        logger.debug("Applying low pass filter with filter frequency {}".format(filter_freq))
+        logger.debug(f"Applying low pass filter with filter frequency {filter_freq}")
         bp = lowpass(filter_freq, self.sampling_frequency)
         strain = TimeSeries(self.time_domain_strain, sample_rate=self.sampling_frequency)
         strain = strain.filter(bp, filtfilt=True)
@@ -408,16 +409,15 @@ class InterferometerStrainData(object):
         strain = TimeSeries(data=data, sample_rate=self.sampling_frequency)
         psd_alpha = 2 * self.roll_off / fft_length
         logger.info(
-            "Tukey window PSD data with alpha={}, roll off={}".format(
-                psd_alpha, self.roll_off))
+            f"Tukey window PSD data with alpha={psd_alpha}, roll off={self.roll_off}")
         psd = strain.psd(
             fftlength=fft_length, overlap=overlap, window=('tukey', psd_alpha))
 
         if outdir:
-            psd_file = '{}/{}_PSD_{}_{}.txt'.format(outdir, name, self.start_time, self.duration)
-            with open('{}'.format(psd_file), 'w+') as opened_file:
+            psd_file = f'{outdir}/{name}_PSD_{self.start_time}_{self.duration}.txt'
+            with open(f'{psd_file}', 'w+') as opened_file:
                 for f, p in zip(psd.frequencies.value, psd.value):
-                    opened_file.write('{} {}\n'.format(f, p))
+                    opened_file.write(f'{f} {p}\n')
 
         return psd.frequencies.value, psd.value
 
@@ -687,7 +687,7 @@ class InterferometerStrainData(object):
             duration=duration, sampling_frequency=sampling_frequency,
             start_time=start_time)
 
-        logger.info('Reading data from frame file {}'.format(frame_file))
+        logger.info(f'Reading data from frame file {frame_file}')
         strain = gwutils.read_frame_file(
             frame_file, start_time=start_time, end_time=start_time + duration,
             buffer_time=buffer_time, channel=channel,
@@ -722,7 +722,7 @@ class InterferometerStrainData(object):
             duration=duration, sampling_frequency=sampling_frequency,
             start_time=start_time)
 
-        logger.info('Fetching data using channel {}'.format(channel))
+        logger.info(f'Fetching data using channel {channel}')
         strain = TimeSeries.get(channel, start_time, start_time + duration)
         strain = strain.resample(sampling_frequency)
 
@@ -744,8 +744,10 @@ class Notch(object):
             self.minimum_frequency = minimum_frequency
             self.maximum_frequency = maximum_frequency
         else:
-            msg = ("Your notch minimum_frequency {} and maximum_frequency {} are invalid"
-                   .format(minimum_frequency, maximum_frequency))
+            msg = (
+                f"Your notch minimum_frequency {minimum_frequency} "
+                f"and maximum_frequency {maximum_frequency} are invalid"
+            )
             raise ValueError(msg)
 
     def get_idxs(self, frequency_array):
@@ -807,7 +809,7 @@ class NotchList(list):
                 if isinstance(notch, tuple) and len(notch) == 2:
                     self.append(Notch(*notch))
                 else:
-                    msg = "notch_list {} is malformed".format(notch_list)
+                    msg = f"notch_list {notch_list} is malformed"
                     raise ValueError(msg)
 
     def check_frequency(self, freq):

@@ -105,7 +105,7 @@ def run_commandline(cl, log_level=20, raise_error=True, return_output=True):
                 cl, stderr=subprocess.STDOUT, shell=True,
                 universal_newlines=True)
         except subprocess.CalledProcessError as e:
-            logger.log(log_level, 'Execution failed: {}'.format(e.output))
+            logger.log(log_level, f'Execution failed: {e.output}')
             if raise_error:
                 raise
             else:

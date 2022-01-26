@@ -58,8 +58,8 @@ def conditional_prior_factory(prior_class):
             self._required_variables = None
             self.condition_func = condition_func
             self._reference_params = reference_params
-            self.__class__.__name__ = 'Conditional{}'.format(prior_class.__name__)
-            self.__class__.__qualname__ = 'Conditional{}'.format(prior_class.__qualname__)
+            self.__class__.__name__ = f'Conditional{prior_class.__name__}'
+            self.__class__.__qualname__ = f'Conditional{prior_class.__qualname__}'
 
         def sample(self, size=None, **required_variables):
             """Draw a sample from the prior
@@ -171,9 +171,10 @@ def conditional_prior_factory(prior_class):
             elif len(required_variables) == 0:
                 return
             else:
-                raise IllegalRequiredVariablesException("Expected kwargs for {}. Got kwargs for {} instead."
-                                                        .format(self.required_variables,
-                                                                list(required_variables.keys())))
+                raise IllegalRequiredVariablesException(
+                    f"Expected kwargs for {self.required_variables}. "
+                    f"Got kwargs for {list(required_variables.keys())} instead."
+                )
 
         @property
         def reference_params(self):
@@ -231,9 +232,9 @@ def conditional_prior_factory(prior_class):
                 instantiation_dict["condition_func"].__module__,
                 instantiation_dict["condition_func"].__name__
             ])
-            args = ', '.join(['{}={}'.format(key, repr(instantiation_dict[key]))
+            args = ', '.join([f'{key}={repr(instantiation_dict[key])}'
                               for key in instantiation_dict])
-            return "{}({})".format(prior_name, args)
+            return f"{prior_name}({args})"
 
     return ConditionalPrior
 

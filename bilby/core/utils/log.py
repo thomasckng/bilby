@@ -25,7 +25,7 @@ def setup_logger(outdir='.', label=None, log_level='INFO', print_version=False):
         try:
             level = getattr(logging, log_level.upper())
         except AttributeError:
-            raise ValueError('log_level {} not understood'.format(log_level))
+            raise ValueError(f'log_level {log_level} not understood')
     else:
         level = int(log_level)
 
@@ -43,7 +43,7 @@ def setup_logger(outdir='.', label=None, log_level='INFO', print_version=False):
     if any([type(h) == logging.FileHandler for h in logger.handlers]) is False:
         if label:
             Path(outdir).mkdir(parents=True, exist_ok=True)
-            log_file = '{}/{}.log'.format(outdir, label)
+            log_file = f'{outdir}/{label}.log'
             file_handler = logging.FileHandler(log_file)
             file_handler.setFormatter(logging.Formatter(
                 '%(asctime)s %(levelname)-8s: %(message)s', datefmt='%H:%M'))
@@ -56,7 +56,7 @@ def setup_logger(outdir='.', label=None, log_level='INFO', print_version=False):
 
     if print_version:
         version = get_version_information()
-        logger.info('Running bilby version: {}'.format(version))
+        logger.info(f'Running bilby version: {version}')
 
 
 def get_version_information():

@@ -40,7 +40,7 @@ def latex_plot_format(func):
             logger.debug("Setting mathdefault in the rcParams")
             rcParams['text.latex.preamble'] = r'\providecommand{\mathdefault}[1][]{}'
 
-        logger.debug("Using BILBY_STYLE={}".format(bilby_style))
+        logger.debug(f"Using BILBY_STYLE={bilby_style}")
         if bilby_style.lower() == "none":
             return func(*args, **kwargs)
         elif os.path.isfile(bilby_style):
@@ -65,8 +65,7 @@ def latex_plot_format(func):
             return func(*args, **kwargs)
         else:
             logger.debug(
-                "Environment variable BILBY_STYLE={} not used"
-                .format(bilby_style)
+                f"Environment variable BILBY_STYLE={bilby_style} not used"
             )
             return func(*args, **kwargs)
     return wrapper_decorator

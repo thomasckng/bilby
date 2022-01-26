@@ -228,10 +228,10 @@ def convert_to_lal_binary_black_hole_parameters(parameters):
                 converted_parameters['mass_ratio']
 
     for idx in ['1', '2']:
-        key = 'chi_{}'.format(idx)
+        key = f'chi_{idx}'
         if key in original_keys:
-            if "chi_{}_in_plane".format(idx) in original_keys:
-                converted_parameters["a_{}".format(idx)] = (
+            if f"chi_{idx}_in_plane" in original_keys:
+                converted_parameters[f"a_{idx}"] = (
                     converted_parameters[f"chi_{idx}"] ** 2
                     + converted_parameters[f"chi_{idx}_in_plane"] ** 2
                 ) ** 0.5
@@ -239,10 +239,10 @@ def convert_to_lal_binary_black_hole_parameters(parameters):
                     converted_parameters[f"chi_{idx}"]
                     / converted_parameters[f"a_{idx}"]
                 )
-            elif "a_{}".format(idx) not in original_keys:
-                converted_parameters['a_{}'.format(idx)] = abs(
+            elif f"a_{idx}" not in original_keys:
+                converted_parameters[f'a_{idx}'] = abs(
                     converted_parameters[key])
-                converted_parameters['cos_tilt_{}'.format(idx)] = \
+                converted_parameters[f'cos_tilt_{idx}'] = \
                     np.sign(converted_parameters[key])
             else:
                 with np.errstate(invalid="raise"):
@@ -788,7 +788,7 @@ def _generate_all_cbc_parameters(sample, defaults, base_conversion,
         except (KeyError, AttributeError):
             default = waveform_defaults[key]
             output_sample[key] = default
-            logger.debug('Assuming {} = {}'.format(key, default))
+            logger.debug(f'Assuming {key} = {default}')
 
     output_sample = fill_from_fixed_priors(output_sample, priors)
     output_sample, _ = base_conversion(output_sample)
@@ -805,14 +805,14 @@ def _generate_all_cbc_parameters(sample, defaults, base_conversion,
             except MarginalizedLikelihoodReconstructionError as e:
                 logger.warning(
                     "Marginalised parameter reconstruction failed with message "
-                    "{}. Some parameters may not have the intended "
-                    "interpretation.".format(e)
+                    f"{e}. Some parameters may not have the intended "
+                    "interpretation."
                 )
         if priors is not None:
             for par, name in zip(
                     ['distance', 'phase', 'time'],
                     ['luminosity_distance', 'phase', 'geocent_time']):
-                if getattr(likelihood, '{}_marginalization'.format(par), False):
+                if getattr(likelihood, f'{par}_marginalization', False):
                     priors[name] = likelihood.priors[name]
 
         if (
@@ -825,8 +825,7 @@ def _generate_all_cbc_parameters(sample, defaults, base_conversion,
                 )
             except TypeError:
                 logger.info(
-                    "Failed to generate sky frame parameters for type {}"
-                    .format(type(output_sample))
+                    f"Failed to generate sky frame parameters for type {type(output_sample)}"
                 )
     if likelihood is not None:
         compute_snrs(output_sample, likelihood, npool=npool)
@@ -837,8 +836,7 @@ def _generate_all_cbc_parameters(sample, defaults, base_conversion,
             output_sample = func(output_sample)
         except KeyError as e:
             logger.info(
-                "Generation of {} parameters failed with message {}".format(
-                    key, e))
+                f"Generation of {key} parameters failed with message {e}")
     return output_sample
 
 
@@ -901,7 +899,7 @@ def generate_all_bns_parameters(sample, likelihood=None, priors=None, npool=1):
         output_sample = generate_tidal_parameters(output_sample)
     except KeyError as e:
         logger.debug(
-            "Generation of tidal parameters failed with message {}".format(e))
+            f"Generation of tidal parameters failed with message {e}")
     return output_sample
 
 
@@ -912,7 +910,7 @@ def generate_specific_parameters(sample, parameters):
         if key in updated_sample:
             output_sample[key] = updated_sample[key]
         else:
-            raise KeyError("{} not in converted sample.".format(key))
+            raise KeyError(f"{key} not in converted sample.")
     return output_sample
 
 
@@ -1124,7 +1122,7 @@ def generate_source_frame_parameters(sample):
 
     for key in ['mass_1', 'mass_2', 'chirp_mass', 'total_mass']:
         if key in output_sample:
-            output_sample['{}_source'.format(key)] =\
+            output_sample[f'{key}_source'] =\
                 output_sample[key] / (1 + output_sample['redshift'])
 
     return output_sample
@@ -1151,9 +1149,9 @@ def compute_snrs(sample, likelihood, npool=1):
             for ifo in likelihood.interferometers:
                 per_detector_snr = likelihood.calculate_snrs(
                     signal_polarizations, ifo)
-                sample['{}_matched_filter_snr'.format(ifo.name)] =\
+                sample[f'{ifo.name}_matched_filter_snr'] =\
                     per_detector_snr.complex_matched_filter_snr
-                sample['{}_optimal_snr'.format(ifo.name)] = \
+                sample[f'{ifo.name}_optimal_snr'] = \
                     per_detector_snr.optimal_snr_squared.real ** 0.5
         else:
             from tqdm.auto import tqdm
@@ -1163,7 +1161,7 @@ def compute_snrs(sample, likelihood, npool=1):
             if npool > 1:
                 pool = multiprocessing.Pool(processes=npool)
                 logger.info(
-                    "Using a pool with size {} for nsamples={}".format(npool, len(sample))
+                    f"Using a pool with size {npool} for nsamples={len(sample)}"
                 )
                 new_samples = pool.map(_compute_snrs, tqdm(fill_args, file=sys.stdout))
                 pool.close()
@@ -1173,8 +1171,8 @@ def compute_snrs(sample, likelihood, npool=1):
             for ii, ifo in enumerate(likelihood.interferometers):
                 matched_filter_snrs = list()
                 optimal_snrs = list()
-                mf_key = '{}_matched_filter_snr'.format(ifo.name)
-                optimal_key = '{}_optimal_snr'.format(ifo.name)
+                mf_key = f'{ifo.name}_matched_filter_snr'
+                optimal_key = f'{ifo.name}_optimal_snr'
                 for new_sample in new_samples:
                     matched_filter_snrs.append(new_sample[ii].complex_matched_filter_snr)
                     optimal_snrs.append(new_sample[ii].optimal_snr_squared.real ** 0.5)
@@ -1237,7 +1235,7 @@ def generate_posterior_samples_from_marginalized_likelihood(
     if isinstance(samples, dict):
         return samples
     elif not isinstance(samples, DataFrame):
-        raise ValueError("Unable to handle input samples of type {}".format(type(samples)))
+        raise ValueError(f"Unable to handle input samples of type {type(samples)}")
     from tqdm.auto import tqdm
 
     logger.info('Reconstructing marginalised parameters.')
@@ -1275,8 +1273,7 @@ def generate_posterior_samples_from_marginalized_likelihood(
     if npool > 1:
         pool = multiprocessing.Pool(processes=npool)
         logger.info(
-            "Using a pool with size {} for nsamples={}"
-            .format(npool, len(samples))
+            f"Using a pool with size {npool} for nsamples={len(samples)}"
         )
     else:
         pool = None

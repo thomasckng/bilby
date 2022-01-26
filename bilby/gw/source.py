@@ -383,8 +383,8 @@ def _base_lal_cbc_fd_waveform(
                                          iota=iota, phase=phase,
                                          eccentricity=eccentricity,
                                          start_frequency=start_frequency)
-                logger.warning("Evaluating the waveform failed with error: {}\n".format(e) +
-                               "The parameters were {}\n".format(failed_parameters) +
+                logger.warning(f"Evaluating the waveform failed with error: {e}\n" +
+                               f"The parameters were {failed_parameters}\n" +
                                "Likelihood will be set to -inf.")
                 return None
             else:
@@ -395,7 +395,7 @@ def _base_lal_cbc_fd_waveform(
 
     if len(hplus.data.data) > len(frequency_array):
         logger.debug("LALsim waveform longer than bilby's `frequency_array`" +
-                     "({} vs {}), ".format(len(hplus.data.data), len(frequency_array)) +
+                     f"({len(hplus.data.data)} vs {len(frequency_array)}), " +
                      "probably because padded with zeros up to the next power of two length." +
                      " Truncating lalsim array.")
         h_plus = hplus.data.data[:len(h_plus)]
@@ -817,8 +817,8 @@ def _base_waveform_frequency_sequence(
                                          spin_2=(spin_2x, spin_2y, spin_2z),
                                          luminosity_distance=luminosity_distance,
                                          iota=iota, phase=phase)
-                logger.warning("Evaluating the waveform failed with error: {}\n".format(e) +
-                               "The parameters were {}\n".format(failed_parameters) +
+                logger.warning(f"Evaluating the waveform failed with error: {e}\n" +
+                               f"The parameters were {failed_parameters}\n" +
                                "Likelihood will be set to -inf.")
                 return None
             else:

@@ -104,11 +104,11 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
             self.weights = dict()
             if isinstance(linear_matrix, str):
                 logger.info(
-                    "Loading linear matrix from {}".format(linear_matrix))
+                    f"Loading linear matrix from {linear_matrix}")
                 linear_matrix = np.load(linear_matrix).T
             if isinstance(quadratic_matrix, str):
                 logger.info(
-                    "Loading quadratic_matrix from {}".format(quadratic_matrix))
+                    f"Loading quadratic_matrix from {quadratic_matrix}")
                 quadratic_matrix = np.load(quadratic_matrix).T
             self._set_weights(linear_matrix=linear_matrix,
                               quadratic_matrix=quadratic_matrix)
@@ -143,10 +143,10 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
 
         calib_linear = interferometer.calibration_model.get_calibration_factor(
             self.frequency_nodes_linear,
-            prefix='recalib_{}_'.format(interferometer.name), **self.parameters)
+            prefix=f'recalib_{interferometer.name}_', **self.parameters)
         calib_quadratic = interferometer.calibration_model.get_calibration_factor(
             self.frequency_nodes_quadratic,
-            prefix='recalib_{}_'.format(interferometer.name), **self.parameters)
+            prefix=f'recalib_{interferometer.name}_', **self.parameters)
 
         h_plus_linear = f_plus * waveform_polarizations['linear']['plus'] * calib_linear
         h_cross_linear = f_cross * waveform_polarizations['linear']['cross'] * calib_linear
@@ -255,11 +255,12 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
             return
         else:
             if getattr(self, "roq_params_file", None) is not None:
-                msg = ("Check ROQ params {} with roq_scale_factor={}"
-                       .format(self.roq_params_file, self.roq_scale_factor))
+                msg = (
+                    f"Check ROQ params {self.roq_params_file} with "
+                    f"roq_scale_factor={self.roq_scale_factor}"
+                )
             else:
-                msg = ("Check ROQ params with roq_scale_factor={}"
-                       .format(self.roq_scale_factor))
+                msg = f"Check ROQ params with roq_scale_factor={self.roq_scale_factor}"
             logger.info(msg)
 
         roq_params = self.roq_params
@@ -272,13 +273,13 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
 
         if ifo.maximum_frequency > roq_maximum_frequency:
             raise BilbyROQParamsRangeError(
-                "Requested maximum frequency {} larger than ROQ basis fhigh {}"
-                .format(ifo.maximum_frequency, roq_maximum_frequency)
+                f"Requested maximum frequency {ifo.maximum_frequency} larger "
+                f"than ROQ basis fhigh {roq_maximum_frequency}"
             )
         if ifo.minimum_frequency < roq_minimum_frequency:
             raise BilbyROQParamsRangeError(
-                "Requested minimum frequency {} lower than ROQ basis flow {}"
-                .format(ifo.minimum_frequency, roq_minimum_frequency)
+                f"Requested minimum frequency {ifo.minimum_frequency} lower "
+                f"than ROQ basis flow {roq_minimum_frequency}"
             )
         if ifo.strain_data.duration != roq_segment_length:
             raise BilbyROQParamsRangeError(
@@ -293,24 +294,24 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
             logger.warning("Unable to check minimum chirp mass ROQ bounds")
         elif priors.minimum_chirp_mass < roq_minimum_chirp_mass:
             raise BilbyROQParamsRangeError(
-                "Prior minimum chirp mass {} less than ROQ basis bound {}"
-                .format(priors.minimum_chirp_mass, roq_minimum_chirp_mass)
+                f"Prior minimum chirp mass {priors.minimum_chirp_mass} less "
+                f"than ROQ basis bound {roq_minimum_chirp_mass}"
             )
 
         if priors.maximum_chirp_mass is None:
             logger.warning("Unable to check maximum_chirp mass ROQ bounds")
         elif priors.maximum_chirp_mass > roq_maximum_chirp_mass:
             raise BilbyROQParamsRangeError(
-                "Prior maximum chirp mass {} greater than ROQ basis bound {}"
-                .format(priors.maximum_chirp_mass, roq_maximum_chirp_mass)
+                f"Prior maximum chirp mass {priors.maximum_chirp_mass} greater "
+                f"than ROQ basis bound {roq_maximum_chirp_mass}"
             )
 
         if priors.minimum_component_mass is None:
             logger.warning("Unable to check minimum component mass ROQ bounds")
         elif priors.minimum_component_mass < roq_minimum_component_mass:
             raise BilbyROQParamsRangeError(
-                "Prior minimum component mass {} less than ROQ basis bound {}"
-                .format(priors.minimum_component_mass, roq_minimum_component_mass)
+                f"Prior minimum component mass {priors.minimum_component_mass} less "
+                f"than ROQ basis bound {roq_minimum_component_mass}"
             )
 
     def _set_weights(self, linear_matrix, quadratic_matrix):
@@ -341,7 +342,7 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
         start_idx = max(
             0,
             int(np.floor((
-                self.priors['{}_time'.format(self.time_reference)].minimum
+                self.priors[f'{self.time_reference}_time'].minimum
                 - earth_light_crossing_time
                 - self.interferometers.start_time
             ) / time_space))
@@ -349,13 +350,13 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
         end_idx = min(
             number_of_time_samples - 1,
             int(np.ceil((
-                self.priors['{}_time'.format(self.time_reference)].maximum
+                self.priors[f'{self.time_reference}_time'].maximum
                 + earth_light_crossing_time
                 - self.interferometers.start_time
             ) / time_space))
         )
         self.weights['time_samples'] = np.arange(start_idx, end_idx + 1) * time_space
-        logger.info("Using {} ROQ time samples".format(len(self.weights['time_samples'])))
+        logger.info(f"Using {len(self.weights['time_samples'])} ROQ time samples")
 
         for ifo in self.interferometers:
             if self.roq_params is not None:
@@ -379,13 +380,12 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
                 ifo_idxs = np.arange(sum(ifo.frequency_mask))
                 if len(ifo_idxs) != len(roq_idxs):
                     raise ValueError(
-                        "Mismatch between ROQ basis and frequency array for "
-                        "{}".format(ifo.name))
+                        f"Mismatch between ROQ basis and frequency array for {ifo.name}"
+                    )
             logger.info(
-                "Building ROQ weights for {} with {} frequencies between {} "
-                "and {}.".format(
-                    ifo.name, len(overlap_frequencies),
-                    min(overlap_frequencies), max(overlap_frequencies)))
+                f"Building ROQ weights for {ifo.name} with {len(overlap_frequencies)} "
+                f"frequencies between {min(overlap_frequencies)} and {max(overlap_frequencies)}."
+            )
 
             ifft_input[:] *= 0.
             self.weights[ifo.name + '_linear'] = \
@@ -406,7 +406,7 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
                 quadratic_matrix[roq_idxs].real,
                 1 / ifo.strain_data.duration)
 
-            logger.info("Finished building weights for {}".format(ifo.name))
+            logger.info(f"Finished building weights for {ifo.name}")
 
         if pyfftw is not None:
             pyfftw.forget_wisdom()
@@ -414,7 +414,7 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
     def save_weights(self, filename, format='npz'):
         if format not in filename:
             filename += "." + format
-        logger.info("Saving ROQ weights to {}".format(filename))
+        logger.info(f"Saving ROQ weights to {filename}")
         if format == 'json':
             with open(filename, 'w') as file:
                 json.dump(self.weights, file, indent=2, cls=BilbyJsonEncoder)
@@ -426,8 +426,8 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
         if format is None:
             format = filename.split(".")[-1]
         if format not in ["json", "npz"]:
-            raise IOError("Format {} not recognized.".format(format))
-        logger.info("Loading ROQ weights from {}".format(filename))
+            raise IOError(f"Format {format} not recognized.")
+        logger.info(f"Loading ROQ weights from {filename}")
         if format == "json":
             with open(filename, 'r') as file:
                 weights = json.load(file, object_hook=decode_bilby_json)
@@ -501,7 +501,7 @@ class ROQGravitationalWaveTransient(GravitationalWaveTransient):
             self.interferometers.frequency_array[-1] * self.interferometers.duration + 1)
         number_of_time_samples = int(2**np.ceil(np.log2(number_of_time_samples)))
         delta_t = self.interferometers.duration / number_of_time_samples
-        logger.info("ROQ time-step = {}".format(delta_t))
+        logger.info(f"ROQ time-step = {delta_t}")
         return delta_t
 
     def _rescale_signal(self, signal, new_distance):

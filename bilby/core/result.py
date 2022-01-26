@@ -51,11 +51,11 @@ def result_file_name(outdir, label, extension='json', gzip=False):
         extension = 'pkl'
     if extension in ['json', 'hdf5', 'pkl']:
         if extension == 'json' and gzip:
-            return os.path.join(outdir, '{}_result.{}.gz'.format(label, extension))
+            return os.path.join(outdir, f'{label}_result.{extension}.gz')
         else:
-            return os.path.join(outdir, '{}_result.{}'.format(label, extension))
+            return os.path.join(outdir, f'{label}_result.{extension}')
     else:
-        raise ValueError("Extension type {} not understood".format(extension))
+        raise ValueError(f"Extension type {extension} not understood")
 
 
 def _determine_file_name(filename, outdir, label, extension, gzip):
@@ -97,7 +97,7 @@ def read_in_result(filename=None, outdir=None, label=None, extension='json', gzi
     elif extension is None:
         raise ValueError("No filetype extension provided")
     else:
-        raise ValueError("Filetype {} not understood".format(extension))
+        raise ValueError(f"Filetype {extension} not understood")
     return result
 
 
@@ -265,7 +265,7 @@ def reweight(result, label=None, new_likelihood=None, new_prior=None,
         result.posterior = result.nested_samples
 
     nposterior = len(result.posterior)
-    logger.info("Reweighting posterior with {} samples".format(nposterior))
+    logger.info(f"Reweighting posterior with {nposterior} samples")
 
     ln_weights, new_log_likelihood_array, new_log_prior_array, old_log_likelihood_array, old_log_prior_array =\
         get_weights_for_reweighting(
@@ -284,7 +284,7 @@ def reweight(result, label=None, new_likelihood=None, new_prior=None,
 
     result.posterior = rejection_sample(result.posterior, weights=weights)
     result.posterior = result.posterior.reset_index(drop=True)
-    logger.info("Rejection sampling resulted in {} samples".format(len(result.posterior)))
+    logger.info(f"Rejection sampling resulted in {len(result.posterior)} samples")
     result.meta_data["reweighted_using_rejection_sampling"] = True
 
     if use_nested_samples:
@@ -468,18 +468,16 @@ class Result(object):
                         dictionary["priors"] = priordict
                     except Exception as e:
                         raise IOError(
-                            "Unable to parse priors from '{}':\n{}".format(
-                                filename, e,
-                            )
+                            f"Unable to parse priors from '{filename}':\n{e}"
                         )
             try:
                 if isinstance(dictionary.get('posterior', None), dict):
                     dictionary['posterior'] = pd.DataFrame(dictionary['posterior'])
                 return cls(**dictionary)
             except TypeError as e:
-                raise IOError("Unable to load dictionary, error={}".format(e))
+                raise IOError(f"Unable to load dictionary, error={e}")
         else:
-            raise IOError("No result '{}' found".format(filename))
+            raise IOError(f"No result '{filename}' found")
 
     _load_doctstring = """ Read in a saved .{format} data file
 
@@ -526,7 +524,7 @@ class Result(object):
             cls = getattr(import_module(data['__module__']), data['__name__'])
         except ImportError:
             logger.debug(
-                "Module {}.{} not found".format(data["__module__"], data["__name__"])
+                f"Module {data['__module__']}.{data['__name__']} not found"
             )
         except KeyError:
             logger.debug("No class specified, using base Result.")
@@ -547,32 +545,26 @@ class Result(object):
                 dictionary = load_json(filename, gzip)
             except JSONDecodeError as e:
                 raise IOError(
-                    "JSON failed to decode {} with message {}".format(filename, e)
+                    f"JSON failed to decode {filename} with message {e}"
                 )
             try:
                 return cls(**dictionary)
             except TypeError as e:
-                raise IOError("Unable to load dictionary, error={}".format(e))
+                raise IOError(f"Unable to load dictionary, error={e}")
         else:
-            raise IOError("No result '{}' found".format(filename))
+            raise IOError(f"No result '{filename}' found")
 
     def __str__(self):
         """Print a summary """
+        output = ""
         if getattr(self, 'posterior', None) is not None:
-            if getattr(self, 'log_noise_evidence', None) is not None:
-                return ("nsamples: {:d}\n"
-                        "ln_noise_evidence: {:6.3f}\n"
-                        "ln_evidence: {:6.3f} +/- {:6.3f}\n"
-                        "ln_bayes_factor: {:6.3f} +/- {:6.3f}\n"
-                        .format(len(self.posterior), self.log_noise_evidence, self.log_evidence,
-                                self.log_evidence_err, self.log_bayes_factor,
-                                self.log_evidence_err))
-            else:
-                return ("nsamples: {:d}\n"
-                        "ln_evidence: {:6.3f} +/- {:6.3f}\n"
-                        .format(len(self.posterior), self.log_evidence, self.log_evidence_err))
-        else:
-            return ''
+            output += f"nsamples: {len(self.posterior):d}\n"
+        if getattr(self, 'log_noise_evidence', None) is not None:
+            output += f"ln_noise_evidence: {self.log_noise_evidence:6.3f}\n"
+        output += f"ln_evidence: {self.log_evidence:6.3f} +/- {self.log_evidence_err:6.3f}\n"
+        if getattr(self, 'log_noise_evidence', None) is not None:
+            output += f"ln_bayes_factor: {self.log_bayes_factor:6.3f} +/- {self.log_evidence_err:6.3f}\n"
+        return output
 
     @property
     def meta_data(self):
@@ -708,7 +700,7 @@ class Result(object):
     @version.setter
     def version(self, version):
         if version is None:
-            self._version = 'bilby={}'.format(utils.get_version_information())
+            self._version = f'bilby={utils.get_version_information()}'
         else:
             self._version = version
 
@@ -729,7 +721,7 @@ class Result(object):
             try:
                 dictionary[attr] = getattr(self, attr)
             except ValueError as e:
-                logger.debug("Unable to save {}, message: {}".format(attr, e))
+                logger.debug(f"Unable to save {attr}, message: {e}")
                 pass
         return dictionary
 
@@ -800,7 +792,7 @@ class Result(object):
                 with open(filename, "wb") as ff:
                     dill.dump(self, ff)
             else:
-                raise ValueError("Extension type {} not understood".format(extension))
+                raise ValueError(f"Extension type {extension} not understood")
         except Exception as e:
             import dill
             filename = ".".join(filename.split(".")[:-1]) + ".pkl"
@@ -808,7 +800,7 @@ class Result(object):
                 dill.dump(self, ff)
             logger.error(
                 "\n\nSaving the data has failed with the following message:\n"
-                "{}\nData has been dumped to {}.\n\n".format(e, filename)
+                f"{e}\nData has been dumped to {filename}.\n\n"
             )
 
     def save_posterior_samples(self, filename=None, outdir=None, label=None):
@@ -832,7 +824,7 @@ class Result(object):
             if label is None:
                 label = self.label
             outdir = self._safe_outdir_creation(outdir, self.save_posterior_samples)
-            filename = '{}/{}_posterior_samples.dat'.format(outdir, label)
+            filename = f'{outdir}/{label}_posterior_samples.dat'
         else:
             outdir = os.path.dirname(filename)
             self._safe_outdir_creation(outdir, self.save_posterior_samples)
@@ -847,7 +839,7 @@ class Result(object):
                 df.loc[:, key + "_abs"] = np.abs(complex_term)
                 df.loc[:, key + "_angle"] = np.angle(complex_term)
 
-        logger.info("Writing samples file to {}".format(filename))
+        logger.info(f"Writing samples file to {filename}")
         df.to_csv(filename, index=False, header=True, sep=' ')
 
     def get_latex_labels_from_parameter_keys(self, keys):
@@ -873,7 +865,7 @@ class Result(object):
             else:
                 label = None
                 logger.debug(
-                    'key {} not a parameter label or latex label'.format(key)
+                    f'key {key} not a parameter label or latex label'
                 )
             if label is None:
                 label = key.replace("_", " ")
@@ -954,7 +946,7 @@ class Result(object):
         summary.plus = quants[2] - summary.median
         summary.minus = summary.median - quants[0]
 
-        fmt = "{{0:{0}}}".format(fmt).format
+        fmt = f"{{0:{fmt}}}".format
         string_template = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
         summary.string = string_template.format(
             fmt(summary.median), fmt(summary.minus), fmt(summary.plus))
@@ -1006,7 +998,7 @@ class Result(object):
             A matplotlib figure object
         """
         import matplotlib.pyplot as plt
-        logger.info('Plotting {} marginal distribution'.format(key))
+        logger.info(f'Plotting {key} marginal distribution')
         label = self.get_latex_labels_from_parameter_keys([key])[0]
         fig, ax = plt.subplots()
         try:
@@ -1014,8 +1006,7 @@ class Result(object):
                     histtype='step', cumulative=cumulative)
         except ValueError as e:
             logger.info(
-                'Failed to generate 1d plot for {}, error message: {}'
-                .format(key, e))
+                f'Failed to generate 1d plot for {key}, error message: {e}')
             return
         ax.set_xlabel(label, fontsize=label_fontsize)
         if truth is not None:
@@ -1102,7 +1093,7 @@ class Result(object):
 
         if file_base_name is None:
             outdir = self._safe_outdir_creation(outdir, self.plot_marginals)
-            file_base_name = '{}/{}_1d/'.format(outdir, self.label)
+            file_base_name = f'{outdir}/{self.label}_1d/'
             check_directory_exists_and_if_not_mkdir(file_base_name)
 
         if priors is True:
@@ -1112,7 +1103,7 @@ class Result(object):
         elif priors in [False, None]:
             priors = dict()
         else:
-            raise ValueError('Input priors={} not understood'.format(priors))
+            raise ValueError(f'Input priors={priors} not understood')
 
         for i, key in enumerate(plot_parameter_keys):
             if not isinstance(self.posterior[key].values[0], float):
@@ -1286,13 +1277,13 @@ class Result(object):
         elif priors in [False, None]:
             pass
         else:
-            raise ValueError('Input priors={} not understood'.format(priors))
+            raise ValueError(f'Input priors={priors} not understood')
 
         if save:
             if filename is None:
                 outdir = self._safe_outdir_creation(kwargs.get('outdir'), self.plot_corner)
-                filename = '{}/{}_corner.png'.format(outdir, self.label)
-            logger.debug('Saving corner plot to {}'.format(filename))
+                filename = f'{outdir}/{self.label}_corner.png'
+            logger.debug(f'Saving corner plot to {filename}')
             safe_save_figure(fig=fig, filename=filename, dpi=dpi)
             plt.close(fig)
 
@@ -1326,8 +1317,8 @@ class Result(object):
 
         fig.tight_layout()
         outdir = self._safe_outdir_creation(kwargs.get('outdir'), self.plot_walkers)
-        filename = '{}/{}_walkers.png'.format(outdir, self.label)
-        logger.debug('Saving walkers plot to {}'.format('filename'))
+        filename = f'{outdir}/{self.label}_walkers.png'
+        logger.debug("Saving walkers plot to filename")
         safe_save_figure(fig=fig, filename=filename)
         plt.close(fig)
 
@@ -1374,7 +1365,7 @@ class Result(object):
 
         xsmooth = np.linspace(np.min(x), np.max(x), npoints)
         fig, ax = plt.subplots()
-        logger.info('Plotting {} draws'.format(ndraws))
+        logger.info(f'Plotting {ndraws} draws')
         for _ in range(ndraws):
             s = model_posterior.sample().to_dict('records')[0]
             ax.plot(xsmooth, model(xsmooth, **s), alpha=0.25, lw=0.1, color='r',
@@ -1403,7 +1394,7 @@ class Result(object):
         fig.tight_layout()
         if filename is None:
             outdir = self._safe_outdir_creation(outdir, self.plot_with_data)
-            filename = '{}/{}_plot_with_data'.format(outdir, self.label)
+            filename = f'{outdir}/{self.label}_plot_with_data'
         safe_save_figure(fig=fig, filename=filename, dpi=dpi)
         plt.close(fig)
 
@@ -1555,7 +1546,7 @@ class Result(object):
         """
         a = getattr(self, name, False)
         b = getattr(other_object, name, False)
-        logger.debug('Checking {} value: {}=={}'.format(name, a, b))
+        logger.debug(f'Checking {name} value: {a}=={b}')
         if (a is not False) and (b is not False):
             type_a = type(a)
             type_b = type(b)
@@ -1718,7 +1709,7 @@ class Result(object):
 
         # add attributes
         version = {
-            "inference_library": "bilby: {}".format(self.sampler),
+            "inference_library": f"bilby: {self.sampler}",
             "inference_library_version": get_version_information()
         }
 
@@ -1967,18 +1958,18 @@ def plot_multiple(results, filename=None, labels=None, colours=None,
         kwargs['labels'] = corner_labels
 
     fig = results[0].plot_corner(save=False, **kwargs)
-    default_filename = '{}/{}'.format(results[0].outdir, 'combined')
+    default_filename = f"{results[0].outdir}/combined"
     lines = []
     default_labels = []
     for i, result in enumerate(results):
         if colours:
             c = colours[i]
         else:
-            c = 'C{}'.format(i)
+            c = f'C{i}'
         hist_kwargs = kwargs.get('hist_kwargs', dict())
         hist_kwargs['color'] = c
         fig = result.plot_corner(fig=fig, save=False, color=c, **kwargs)
-        default_filename += '_{}'.format(result.label)
+        default_filename += f'_{result.label}'
         lines.append(mpllines.Line2D([0], [0], color=c))
         default_labels.append(result.label)
 
@@ -2066,9 +2057,9 @@ def make_pp_plot(results, filename=None, save=True, confidence_interval=[0.68, 0
             ignore_index=True)
 
     if lines is None:
-        colors = ["C{}".format(i) for i in range(8)]
+        colors = [f"C{i}" for i in range(8)]
         linestyles = ["-", "--", ":"]
-        lines = ["{}{}".format(a, b) for a, b in product(linestyles, colors)]
+        lines = [f"{a}{b}" for a, b in product(linestyles, colors)]
     if len(lines) < len(credible_levels.keys()):
         raise ValueError("Larger number of parameters than unique linestyles")
 
@@ -2102,13 +2093,13 @@ def make_pp_plot(results, filename=None, save=True, confidence_interval=[0.68, 0
                        len(credible_levels) for xx in x_values])
         pvalue = scipy.stats.kstest(credible_levels[key], 'uniform').pvalue
         pvalues.append(pvalue)
-        logger.info("{}: {}".format(key, pvalue))
+        logger.info(f"{key}: {pvalue}")
 
         try:
             name = results[0].priors[key].latex_label
         except AttributeError:
             name = key
-        label = "{} ({:2.3f})".format(name, pvalue)
+        label = f"{name} ({pvalue:2.3f})"
         plt.plot(x_values, pp, lines[ii], label=label, **kwargs)
 
     Pvals = namedtuple('pvals', ['combined_pvalue', 'pvalues', 'names'])
@@ -2116,11 +2107,10 @@ def make_pp_plot(results, filename=None, save=True, confidence_interval=[0.68, 0
                   pvalues=pvalues,
                   names=list(credible_levels.keys()))
     logger.info(
-        "Combined p-value: {}".format(pvals.combined_pvalue))
+        f"Combined p-value: {pvals.combined_pvalue}")
 
     if title:
-        ax.set_title("N={}, p-value={:2.4f}".format(
-            len(results), pvals.combined_pvalue))
+        ax.set_title(f"N={len(results)}, p-value={pvals.combined_pvalue:2.4f}")
     ax.set_xlabel("C.I.")
     ax.set_ylabel("Fraction of events in C.I.")
     ax.legend(handlelength=2, labelspacing=0.25, fontsize=legend_fontsize)

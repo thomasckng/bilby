@@ -4,8 +4,8 @@ import logging
 import numpy as np
 
 from ..core.likelihood import Likelihood
-from .model import Model
 from ..core.prior import PriorDict
+from .model import Model
 
 
 class HyperparameterLikelihood(Likelihood):
@@ -96,8 +96,7 @@ class HyperparameterLikelihood(Likelihood):
             data.pop('log_prior')
         if 'prior' not in data.keys():
             data['prior'] = []
-        logging.debug('Downsampling to {} samples per posterior.'.format(
-            self.max_samples))
+        logging.debug(f'Downsampling to {self.max_samples} samples per posterior.')
         for posterior in self.posteriors:
             temp = posterior.sample(self.max_samples)
             if self.sampling_prior is not None:

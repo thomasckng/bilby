@@ -46,6 +46,10 @@ class PriorDict(dict):
         else:
             self.conversion_function = self.default_conversion_function
 
+    def __repr__(self):
+        from ..utils.io import _generic_class_repr
+        return _generic_class_repr(self)
+
     def evaluate_constraints(self, sample):
         out_sample = self.conversion_function(sample)
         prob = 1
@@ -82,25 +86,24 @@ class PriorDict(dict):
         """
 
         check_directory_exists_and_if_not_mkdir(outdir)
-        prior_file = os.path.join(outdir, "{}.prior".format(label))
-        logger.debug("Writing priors to {}".format(prior_file))
+        prior_file = os.path.join(outdir, f"{label}.prior")
+        logger.debug(f"Writing priors to {prior_file}")
         joint_dists = []
         with open(prior_file, "w") as outfile:
             for key in self.keys():
                 if JointPrior in self[key].__class__.__mro__:
-                    distname = '_'.join(self[key].dist.names) + '_{}'.format(self[key].dist.distname)
+                    distname = '_'.join(self[key].dist.names) + f'_{self[key].dist.distname}'
                     if distname not in joint_dists:
                         joint_dists.append(distname)
                         outfile.write(
-                            "{} = {}\n".format(distname, self[key].dist))
+                            f"{distname} = {self[key].dist}\n")
                     diststr = repr(self[key].dist)
                     priorstr = repr(self[key])
                     outfile.write(
-                        "{} = {}\n".format(key, priorstr.replace(diststr,
-                                                                 distname)))
+                        f"{key} = {priorstr.replace(diststr, distname)}\n")
                 else:
                     outfile.write(
-                        "{} = {}\n".format(key, self[key]))
+                        f"{key} = {self[key]}\n")
 
     def _get_json_dict(self):
         self.convert_floats_to_delta_functions()
@@ -112,8 +115,8 @@ class PriorDict(dict):
 
     def to_json(self, outdir, label):
         check_directory_exists_and_if_not_mkdir(outdir)
-        prior_file = os.path.join(outdir, "{}_prior.json".format(label))
-        logger.debug("Writing priors to {}".format(prior_file))
+        prior_file = os.path.join(outdir, f"{label}_prior.json")
+        logger.debug(f"Writing priors to {prior_file}")
         with open(prior_file, "w") as outfile:
             json.dump(self._get_json_dict(), outfile, cls=BilbyJsonEncoder,
                       indent=2)
@@ -158,9 +161,10 @@ class PriorDict(dict):
                 import_module(prior_dict["__module__"]),
                 prior_dict["__name__"])
         except ImportError:
-            logger.debug("Cannot import prior module {}.{}".format(
-                prior_dict["__module__"], prior_dict["__name__"]
-            ))
+            logger.debug(
+                f"Cannot import prior module "
+                f"{prior_dict['__module__']}.{prior_dict['__name__']}"
+            )
             class_ = cls
         except KeyError:
             logger.debug("Cannot find module name to load")
@@ -196,7 +200,7 @@ class PriorDict(dict):
                 args = '('.join(val.split('(')[1:])[:-1]
                 try:
                     dictionary[key] = DeltaFunction(peak=float(cls))
-                    logger.debug("{} converted to DeltaFunction prior".format(key))
+                    logger.debug(f"{key} converted to DeltaFunction prior")
                     continue
                 except ValueError:
                     pass
@@ -211,16 +215,14 @@ class PriorDict(dict):
                     cls = getattr(import_module(module), cls, cls)
                 except ModuleNotFoundError:
                     logger.error(
-                        "Cannot import prior class {} for entry: {}={}".format(
-                            cls, key, val
-                        )
+                        f"Cannot import prior class {cls} for entry: {key}={val}"
                     )
                     raise
                 if key.lower() in ["conversion_function", "condition_func"]:
                     setattr(self, key, cls)
                 elif isinstance(cls, str):
                     if "(" in val:
-                        raise TypeError("Unable to parse prior class {}".format(cls))
+                        raise TypeError(f"Unable to parse prior class {cls}")
                     else:
                         continue
                 elif (cls.__name__ in ['MultivariateGaussianDist',
@@ -235,8 +237,8 @@ class PriorDict(dict):
                         dictionary[key] = cls.from_repr(args)
                     except TypeError as e:
                         raise TypeError(
-                            "Unable to parse prior, bad entry: {} "
-                            "= {}. Error message {}".format(key, val, e)
+                            f"Unable to parse prior, bad entry: {key} "
+                            f"= {val}. Error message {e}"
                         )
             elif isinstance(val, dict):
                 try:
@@ -245,17 +247,19 @@ class PriorDict(dict):
                         val.get("__name__", "none"))
                     dictionary[key] = _class(**val.get("kwargs", dict()))
                 except ImportError:
-                    logger.debug("Cannot import prior module {}.{}".format(
-                        val.get("__module__", "none"), val.get("__name__", "none")
-                    ))
+                    logger.debug(
+                        f"Cannot import prior module {val.get('__module__', 'none')}"
+                        f".{val.get('__name__', 'none')}"
+                    )
                     logger.warning(
-                        'Cannot convert {} into a prior object. '
-                        'Leaving as dictionary.'.format(key))
+                        f'Cannot convert {key} into a prior object. '
+                        'Leaving as dictionary.'
+                    )
                     continue
             else:
                 raise TypeError(
-                    "Unable to parse prior, bad entry: {} "
-                    "= {} of type {}".format(key, val, type(val))
+                    f"Unable to parse prior, bad entry: {key} "
+                    f"= {val} of type {type(val)}"
                 )
         self.update(dictionary)
 
@@ -267,11 +271,10 @@ class PriorDict(dict):
             elif isinstance(self[key], float) or isinstance(self[key], int):
                 self[key] = DeltaFunction(self[key])
                 logger.debug(
-                    "{} converted to delta function prior.".format(key))
+                    f"{key} converted to delta function prior.")
             else:
                 logger.debug(
-                    "{} cannot be converted to delta function prior."
-                    .format(key))
+                    f"{key} cannot be converted to delta function prior.")
 
     def fill_priors(self, likelihood, default_priors_file=None):
         """
@@ -308,9 +311,10 @@ class PriorDict(dict):
                 if default_prior is None:
                     set_val = likelihood.parameters[missing_key]
                     logger.warning(
-                        "Parameter {} has no default prior and is set to {}, this"
-                        " will not be sampled and may cause an error."
-                        .format(missing_key, set_val))
+                        f"Parameter {missing_key} has no default prior and is "
+                        f"set to {set_val}, this will not be sampled and may "
+                        f"cause an error."
+                    )
                 else:
                     self[missing_key] = default_prior
 
@@ -373,7 +377,7 @@ class PriorDict(dict):
             elif isinstance(self[key], Prior):
                 samples[key] = self[key].sample(size=size)
             else:
-                logger.debug('{} not a known prior.'.format(key))
+                logger.debug(f'{key} not a known prior.')
         return samples
 
     @property
@@ -579,8 +583,9 @@ class PriorDict(dict):
             temp = self.copy()
             del temp[key]
             if temp.test_redundancy(key, disable_logging=True):
-                logger.warning('{} is a redundant key in this {}.'
-                               .format(key, self.__class__.__name__))
+                logger.warning(
+                    f'{key} is a redundant key in this {self.__class__.__name__}.'
+                )
                 redundant = True
         return redundant
 
@@ -674,7 +679,7 @@ class ConditionalPriorDict(PriorDict):
                         rvars = {key: value[i] for key, value in required_variables.items()}
                         samples[key][i] = subset_dict[key].sample(**rvars)
             else:
-                logger.debug('{} not a known prior.'.format(key))
+                logger.debug(f'{key} not a known prior.')
         return samples
 
     def get_required_variables(self, key):
@@ -807,7 +812,7 @@ class DirichletPriorDict(ConditionalPriorDict):
         self.label = label
         super(DirichletPriorDict, self).__init__(dictionary=dict())
         for ii in range(n_dim - 1):
-            self[label + "{}".format(ii)] = DirichletElement(
+            self[label + f"{ii}"] = DirichletElement(
                 order=ii, n_dimensions=n_dim, label=label
             )
 
@@ -830,9 +835,10 @@ class DirichletPriorDict(ConditionalPriorDict):
                 import_module(prior_dict["__module__"]),
                 prior_dict["__name__"])
         except ImportError:
-            logger.debug("Cannot import prior module {}.{}".format(
-                prior_dict["__module__"], prior_dict["__name__"]
-            ))
+            logger.debug(
+                f"Cannot import prior module "
+                f"{prior_dict['__module__']}.{prior_dict['__name__']}"
+            )
         except KeyError:
             logger.debug("Cannot find module name to load")
         for key in ["__module__", "__name__", "__prior_dict__"]:
@@ -873,7 +879,7 @@ def create_default_prior(name, default_priors_file=None):
             prior = default_priors[name]
         else:
             logger.debug(
-                "No default prior found for variable {}.".format(name))
+                f"No default prior found for variable {name}.")
             prior = None
     return prior
 

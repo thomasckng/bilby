@@ -38,7 +38,7 @@ class SlabSpikePrior(Prior):
         try:
             self.inverse_cdf_below_spike = self._find_inverse_cdf_fraction_before_spike()
         except Exception as e:
-            logger.warning("Disregard the following warning when running tests:\n {}".format(e))
+            logger.warning(f"Disregard the following warning when running tests:\n {e}")
 
     @property
     def spike_location(self):
@@ -49,7 +49,7 @@ class SlabSpikePrior(Prior):
         if spike_loc is None:
             spike_loc = self.minimum
         if not self.minimum <= spike_loc <= self.maximum:
-            raise ValueError("Spike location {} not within prior domain ".format(spike_loc))
+            raise ValueError(f"Spike location {spike_loc} not within prior domain ")
         self._spike_loc = spike_loc
 
     @property
@@ -61,7 +61,7 @@ class SlabSpikePrior(Prior):
         if 0 <= spike_height <= 1:
             self._spike_height = spike_height
         else:
-            raise ValueError("Spike height must be between 0 and 1, but is {}".format(spike_height))
+            raise ValueError(f"Spike height must be between 0 and 1, but is {spike_height}")
 
     @property
     def slab_fraction(self):

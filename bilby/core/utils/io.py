@@ -154,9 +154,8 @@ def decode_bilby_json(dct):
             cls = getattr(import_module(dct["__module__"]), dct["__name__"])
         except AttributeError:
             logger.debug(
-                "Unknown prior class for parameter {}, defaulting to base Prior object".format(
-                    dct["kwargs"]["name"]
-                )
+                f"Unknown prior class for parameter {dct['kwargs']['name']}, "
+                f"defaulting to base Prior object"
             )
             from ..prior import Prior
 
@@ -392,14 +391,14 @@ def move_old_file(filename, overwrite=False):
     """
     if os.path.isfile(filename):
         if overwrite:
-            logger.debug("Removing existing file {}".format(filename))
+            logger.debug(f"Removing existing file {filename}")
             os.remove(filename)
         else:
             logger.debug(
-                "Renaming existing file {} to {}.old".format(filename, filename)
+                f"Renaming existing file {filename} to {filename}.old"
             )
             shutil.move(filename, filename + ".old")
-    logger.debug("Saving result to {}".format(filename))
+    logger.debug(f"Saving result to {filename}")
 
 
 def safe_save_figure(fig, filename, **kwargs):
@@ -412,3 +411,52 @@ def safe_save_figure(fig, filename, **kwargs):
         logger.debug("Failed to save plot with tex labels turning off tex.")
         rcParams["text.usetex"] = False
         fig.savefig(fname=filename, **kwargs)
+
+
+class _ClassRepr:
+    """
+    Helper for __repr__ methods for Bilby classes.
+
+    The _class_depth attribute keeps track of the depth of recursive calls.
+
+    An example formatting is
+
+    .. code-block:: python
+
+       >> foo = module_1.SomeClass(x=1)
+       >> bar = module_2.OtherClass(y=2, w=foo)
+       >> print(foo)
+       module_2.OtherClass(
+           y=2,
+           w=module_1.SomeClass(
+               x=1
+           )
+       )
+
+    """
+
+    _class_depth = 0
+    _tab = "    "
+
+    @classmethod
+    def __call__(cls, self):
+        from .introspection import get_function_path, infer_args_from_method
+        cls._class_depth += 1
+        line_start = cls._class_depth * cls._tab
+        args = infer_args_from_method(self.__init__)
+        kwargs = dict()
+        for arg in args:
+            value = getattr(self, arg, None)
+            if callable(value):
+                value = get_function_path(value)
+            kwargs[arg] = value
+        kwarg_string = ",\n".join([f"{line_start}{key}={value}" for key, value in kwargs.items()])
+        output = (
+            f"{self.__class__.__module__}.{self.__class__.__name__}"
+            f"(\n{kwarg_string}\n{(cls._class_depth - 1) * cls._tab})"
+        )
+        cls._class_depth -= 1
+        return output
+
+
+_generic_class_repr = _ClassRepr()
