@@ -93,17 +93,16 @@ class TestRunningSamplers(unittest.TestCase):
         bilby.core.utils.command_line_args.bilby_test_mode = False
         shutil.rmtree("outdir")
 
-    @parameterized.expand(_sampler_kwargs.keys())
-    def test_run_sampler_single(self, sampler):
-        pytest.importorskip(sampler_imports.get(sampler, sampler))
-        self._run_sampler(sampler, pool_size=1)
-
-    @parameterized.expand(_sampler_kwargs.keys())
-    def test_run_sampler_pool(self, sampler):
-        pytest.importorskip(sampler_imports.get(sampler, sampler))
-        self._run_sampler(sampler, pool_size=1)
+    # @parameterized.expand(_sampler_kwargs.keys())
+    # def test_run_sampler_single(self, sampler):
+    #     self._run_sampler(sampler, pool_size=1)
+    #
+    # @parameterized.expand(_sampler_kwargs.keys())
+    # def test_run_sampler_pool(self, sampler):
+    #     self._run_sampler(sampler, pool_size=2)
 
     def _run_sampler(self, sampler, pool_size, **extra_kwargs):
+        pytest.importorskip(sampler_imports.get(sampler, sampler))
         bilby.core.utils.check_directory_exists_and_if_not_mkdir("outdir")
         kwargs = _sampler_kwargs[sampler]
         kwargs["resume"] = kwargs.get("resume", False)
@@ -111,7 +110,7 @@ class TestRunningSamplers(unittest.TestCase):
             likelihood=self.likelihood,
             priors=self.priors,
             sampler=sampler,
-            save=True,
+            save=False,
             npool=pool_size,
             conversion_function=self.conversion_function,
             **kwargs,
@@ -122,29 +121,33 @@ class TestRunningSamplers(unittest.TestCase):
 
     @parameterized.expand(_sampler_kwargs.keys())
     def test_interrupt_sampler_single(self, sampler):
-        pytest.importorskip(sampler)
-        self._run_sampler(sampler, pool_size=1)
+        self._run_with_signal_handling(sampler, pool_size=1)
 
     @parameterized.expand(_sampler_kwargs.keys())
     def test_interrupt_sampler_pool(self, sampler):
-        pytest.importorskip(sampler)
-        self._run_sampler(sampler, pool_size=1)
+        self._run_with_signal_handling(sampler, pool_size=2)
 
     def _run_with_signal_handling(self, sampler, pool_size=1):
-        pytest.importorskip(sampler)
+        pytest.importorskip(sampler_imports.get(sampler, sampler))
         pid = os.getpid()
 
         def trigger_signal():
             # You could do something more robust, e.g. wait until port is listening
-            time.sleep(1)
+            time.sleep(4)
             os.kill(pid, SIGINT)
 
         thread = threading.Thread(target=trigger_signal)
         thread.daemon = True
         thread.start()
 
+        def slow_func(x, m, c):
+            time.sleep(0.01)
+            return m * x + c
+
+        self.likelihood._func = slow_func
+
         try:
-            self._run_sampler(sampler=sampler, pool_size=pool_size, checkpoint_exit_code=5)
+            self._run_sampler(sampler=sampler, pool_size=pool_size, exit_code=5)
         except SystemExit as error:
             self.assertEqual(error.code, 5)
 
