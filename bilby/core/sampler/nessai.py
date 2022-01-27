@@ -52,9 +52,7 @@ class Nessai(NestedSampler):
                     }
                 )
             # Defaults for bilby that will override nessai defaults
-            bilby_defaults = dict(
-                output=None,
-            )
+            bilby_defaults = dict(output=None, exit_code=self.exit_code)
             kwargs.update(bilby_defaults)
             self._default_kwargs = kwargs
         return self._default_kwargs
