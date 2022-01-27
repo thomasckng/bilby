@@ -451,6 +451,13 @@ class Ptemcee(MCMCSampler):
         else:
             raise SamplerError(f"pos0={self.pos0} not implemented")
 
+    def _close_pool(self):
+        if getattr(self.sampler, "pool", None) is not None:
+            self.sampler.pool = None
+        if "pool" in self.result.sampler_kwargs:
+            del self.result.sampler_kwargs["pool"]
+        super(Ptemcee, self)._close_pool()
+
     @signal_wrapper
     def run_sampler(self):
         self._setup_pool()
@@ -585,8 +592,7 @@ class Ptemcee(MCMCSampler):
             seconds=np.sum(self.time_per_check)
         )
 
-        if self.pool:
-            self.pool.close()
+        self._close_pool()
 
         return self.result
 
@@ -981,8 +987,10 @@ def checkpoint(
         df.to_csv(filename, index=False, header=True, sep=" ")
 
     # Pickle the resume artefacts
-    sampler_copy = copy.copy(sampler)
-    del sampler_copy.pool
+    pool = sampler.pool
+    sampler.pool = None
+    sampler_copy = copy.deepcopy(sampler)
+    sampler.pool = pool
 
     data = dict(
         iteration=iteration,
