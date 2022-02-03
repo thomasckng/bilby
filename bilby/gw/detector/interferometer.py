@@ -1,5 +1,4 @@
 import os
-import sys
 
 import numpy as np
 
@@ -780,9 +779,6 @@ class Interferometer(object):
     ))
     def to_hdf5(self, outdir='outdir', label=None):
         import deepdish
-        if sys.version_info[0] < 3:
-            raise NotImplementedError('Pickling of Interferometer is not supported in Python 2.'
-                                      'Use Python 3 instead.')
         if label is None:
             label = self.name
         utils.check_directory_exists_and_if_not_mkdir('outdir')
@@ -797,9 +793,6 @@ class Interferometer(object):
     @docstring(_load_docstring.format(format="hdf5"))
     def from_hdf5(cls, filename=None):
         import deepdish
-        if sys.version_info[0] < 3:
-            raise NotImplementedError('Pickling of Interferometer is not supported in Python 2.'
-                                      'Use Python 3 instead.')
 
         res = deepdish.io.load(filename)
         if res.__class__ != cls:
