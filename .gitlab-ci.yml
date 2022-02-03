@@ -112,7 +112,7 @@ precommits-py3.9:
 .unit-tests: &unit-test
   stage: test
   script:
-    - python -m pip install .
+    - python -m pip install -e .
     - python -m pip list installed
 
     - pytest --cov=bilby --durations 10
@@ -145,7 +145,7 @@ python-3.9:
 .test-sampler: &test-sampler
   stage: test
   script:
-    - python -m pip install .
+    - python -m pip install -e .
     - python -m pip list installed
 
     - pytest test/integration/sampler_run_test.py --durations 10
@@ -173,7 +173,7 @@ integration-tests-python-3.9:
   only:
     - schedules
   script:
-    - python -m pip install .
+    - python -m pip install -e .
     - python -m pip list installed
     # Run tests which are only done on schedule
     - pytest test/integration/example_test.py
@@ -183,7 +183,7 @@ integration-tests-python-3.9:
   only:
     - schedules
   script:
-    - python -m pip install .
+    - python -m pip install -e .
     - python -m pip list installed
     - pytest test/gw/plot_test.py
 
@@ -212,7 +212,7 @@ docs:
   script:
     # Make the documentation
     - apt-get -yqq install pandoc
-    - python -m pip install .
+    - python -m pip install -e .
     - cd docs
     - pip install ipykernel ipython jupyter
     - cp ../examples/tutorials/*.ipynb ./
