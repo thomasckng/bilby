@@ -13,5 +13,7 @@ MANIFEST
 *.dat
 *.version
 *.ipynb_checkpoints
+*.so
+*.c
 outdir/*
 .idea/*
