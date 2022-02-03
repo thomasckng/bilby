@@ -39,9 +39,7 @@ containers:
   stage: initial
   image: python
   before_script:
-    # this is required because pytables doesn't use a wheel on py37
-    - apt-get -yqq update
-    - apt-get -yqq install libhdf5-dev
+    - python -m pip install numpy
   script:
     - python -m pip install .
     - python -m pip list installed
