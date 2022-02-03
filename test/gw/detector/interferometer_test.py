@@ -102,15 +102,8 @@ class TestInterferometer(unittest.TestCase):
     def test_max_freq_setting(self):
         self.assertEqual(self.ifo.strain_data.maximum_frequency, self.maximum_frequency)
 
-    def test_antenna_response_default(self):
-        with mock.patch("bilby.gw.utils.get_polarization_tensor") as m:
-            with mock.patch("numpy.einsum") as n:
-                m.return_value = 0
-                n.return_value = 1
-                self.assertEqual(self.ifo.antenna_response(234, 52, 54, 76, "plus"), 1)
-
     def test_antenna_response_einsum(self):
-        with mock.patch("bilby.gw.utils.get_polarization_tensor") as m:
+        with mock.patch("bilby.gw._geometry.get_polarization_tensor") as m:
             m.return_value = np.ones((3, 3))
             self.assertAlmostEqual(
                 self.ifo.antenna_response(234, 52, 54, 76, "plus"),
@@ -321,7 +314,7 @@ class TestInterferometer(unittest.TestCase):
             self.ifo.inject_signal(injection_polarizations=None, parameters=None)
 
     def test_time_delay_from_geocenter(self):
-        with mock.patch("bilby.gw.utils.time_delay_geocentric") as m:
+        with mock.patch("bilby.gw._geometry.time_delay_from_geocenter") as m:
             m.return_value = 1
             self.assertEqual(self.ifo.time_delay_from_geocenter(1, 2, 3), 1)
 
