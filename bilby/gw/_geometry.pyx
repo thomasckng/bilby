@@ -5,10 +5,10 @@ cimport numpy as np
 import lal
 from libc.math cimport sin, cos, fmod, pi, acos, atan2, atan, pow
 
-cdef float CC = 299792458.0
+cdef double CC = 299792458.0
 
 
-cpdef time_delay_geocentric(np.ndarray detector1, np.ndarray detector2, float ra, float dec, float time):
+cpdef time_delay_geocentric(np.ndarray detector1, np.ndarray detector2, double ra, double dec, double time):
     """
     Calculate time delay between two detectors in geocentric coordinates based on XLALArrivaTimeDiff in TimeDelay.c
     Parameters
@@ -54,7 +54,7 @@ cpdef time_delay_geocentric(np.ndarray detector1, np.ndarray detector2, float ra
 _GEOCENTER = np.zeros(3, dtype=float)
 
 
-cpdef time_delay_from_geocenter(np.ndarray detector1, float ra, float dec, float time):
+cpdef time_delay_from_geocenter(np.ndarray detector1, double ra, double dec, double time):
     """
     Calculate time delay between a detectors and the geocenter
     based on XLALArrivalTimeDiff in TimeDelay.c
@@ -336,7 +336,7 @@ cpdef three_by_three_matrix_contraction(np.ndarray x, np.ndarray y):
         The contracted value
 
     """
-    cdef float output = 0
+    cdef double output = 0
     cdef double[:, :] x_view = x
     cdef double[:, :] y_view = y
 
