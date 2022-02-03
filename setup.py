@@ -1,14 +1,33 @@
 #!/usr/bin/env python
 
-from setuptools import setup
+import os
 import subprocess
 import sys
-import os
+from setuptools import Extension, setup
+from setuptools.command.build_ext import build_ext
 
-# check that python version is 3.7 or above
+import numpy as np
+
 python_version = sys.version_info
-if python_version < (3, 7):
-    sys.exit("Python < 3.7 is not supported, aborting setup")
+if python_version < (3, 8):
+    sys.exit("Python < 3.8 is not supported, aborting setup")
+
+
+class LazyImportBuildExtCmd(build_ext):
+    def finalize_options(self):
+        from Cython.Build import cythonize
+
+        self.distribution.ext_modules = cythonize(self.distribution.ext_modules)
+        super(LazyImportBuildExtCmd, self).finalize_options()
+
+
+extensions = [
+    Extension(
+        "bilby.gw._geometry",
+        ["bilby/gw/_geometry.pyx"],
+        include_dirs=[np.get_include()],
+    ),
+]
 
 
 def write_version_file(version):
@@ -121,4 +140,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
+    ext_modules=extensions,
+    setup_requires=["cython", "numpy"],
+    cmdclass={"build_ext": LazyImportBuildExtCmd},
 )

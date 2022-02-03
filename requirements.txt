@@ -12,4 +12,3 @@ h5py
 tables
 astropy
 attrs
-git+https://git.ligo.org/colm.talbot/bilby-cython.git
