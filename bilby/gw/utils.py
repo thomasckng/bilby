@@ -74,7 +74,7 @@ def time_delay_geocentric(detector1, detector2, ra, dec, time):
     float: Time delay between the two detectors in the geocentric frame
 
     """
-    from bilby_cython.geometry import time_delay_geocentric
+    from ._geometry import time_delay_geocentric
     return time_delay_geocentric(detector1, detector2, ra, dec, time)
 
 
@@ -105,7 +105,7 @@ def get_polarization_tensor(ra, dec, time, psi, mode):
     array_like: A 3x3 representation of the polarization_tensor for the specified mode.
 
     """
-    from bilby_cython.geometry import get_polarization_tensor
+    from ._geometry import get_polarization_tensor
     return get_polarization_tensor(ra, dec, time, psi, mode)
 
 
@@ -269,7 +269,7 @@ def zenith_azimuth_to_theta_phi(zenith, azimuth, ifos):
     theta, phi: float
         The zenith and azimuthal angles in the earth frame.
     """
-    from bilby_cython.geometry import zenith_azimuth_to_theta_phi
+    from ._geometry import zenith_azimuth_to_theta_phi
     delta_x = ifos[0].geometry.vertex - ifos[1].geometry.vertex
     return zenith_azimuth_to_theta_phi(zenith, azimuth, delta_x)
 

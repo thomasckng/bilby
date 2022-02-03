@@ -271,7 +271,7 @@ class Interferometer(object):
         array_like: A 3x3 array representation of the antenna response for the specified mode
 
         """
-        from bilby_cython.geometry import get_polarization_tensor, three_by_three_matrix_contraction
+        from .._geometry import get_polarization_tensor, three_by_three_matrix_contraction
         polarization_tensor = get_polarization_tensor(ra, dec, time, psi, mode)
         return three_by_three_matrix_contraction(self.geometry.detector_tensor, polarization_tensor)
 
@@ -528,7 +528,7 @@ class Interferometer(object):
         =======
         float: The time delay from geocenter in seconds
         """
-        from bilby_cython.geometry import time_delay_from_geocenter
+        from .._geometry import time_delay_from_geocenter
         return time_delay_from_geocenter(self.geometry.vertex, ra, dec, time)
 
     def vertex_position_geocentric(self):
