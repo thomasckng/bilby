@@ -93,13 +93,13 @@ class TestRunningSamplers(unittest.TestCase):
         bilby.core.utils.command_line_args.bilby_test_mode = False
         shutil.rmtree("outdir")
 
-    # @parameterized.expand(_sampler_kwargs.keys())
-    # def test_run_sampler_single(self, sampler):
-    #     self._run_sampler(sampler, pool_size=1)
-    #
-    # @parameterized.expand(_sampler_kwargs.keys())
-    # def test_run_sampler_pool(self, sampler):
-    #     self._run_sampler(sampler, pool_size=2)
+    @parameterized.expand(_sampler_kwargs.keys())
+    def test_run_sampler_single(self, sampler):
+        self._run_sampler(sampler, pool_size=1)
+
+    @parameterized.expand(_sampler_kwargs.keys())
+    def test_run_sampler_pool(self, sampler):
+        self._run_sampler(sampler, pool_size=2)
 
     def _run_sampler(self, sampler, pool_size, **extra_kwargs):
         pytest.importorskip(sampler_imports.get(sampler, sampler))
@@ -129,7 +129,10 @@ class TestRunningSamplers(unittest.TestCase):
 
     def _run_with_signal_handling(self, sampler, pool_size=1):
         pytest.importorskip(sampler_imports.get(sampler, sampler))
+        if bilby.core.sampler.IMPLEMENTED_SAMPLERS[sampler].hard_exit:
+            pytest.skip(f"{sampler} hard exits, can't test signal handling.")
         pid = os.getpid()
+        print(sampler)
 
         def trigger_signal():
             # You could do something more robust, e.g. wait until port is listening
@@ -146,10 +149,12 @@ class TestRunningSamplers(unittest.TestCase):
 
         self.likelihood._func = slow_func
 
-        try:
-            self._run_sampler(sampler=sampler, pool_size=pool_size, exit_code=5)
-        except SystemExit as error:
-            self.assertEqual(error.code, 5)
+        with self.assertRaises(SystemExit):
+            try:
+                self._run_sampler(sampler=sampler, pool_size=pool_size, exit_code=5)
+            except SystemExit as error:
+                self.assertEqual(error.code, 5)
+                raise
 
 
 if __name__ == "__main__":

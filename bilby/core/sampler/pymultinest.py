@@ -60,8 +60,8 @@ class Pymultinest(_TemporaryFileSampler, NestedSampler):
         init_MPI=False,
         dump_callback=None,
     )
-
     short_name = "pm"
+    hard_exit = True
 
     def __init__(
         self,

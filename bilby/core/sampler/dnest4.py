@@ -112,8 +112,8 @@ class DNest4(_TemporaryFileSampler, NestedSampler):
         outputfiles_basename=None,
         backend="memory",
     )
-
     short_name = "dn4"
+    hard_exit = True
 
     def __init__(
         self,

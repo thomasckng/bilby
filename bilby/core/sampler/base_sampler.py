@@ -169,6 +169,10 @@ class Sampler(object):
         System exit code to return on interrupt
     kwargs: dict
         Dictionary of keyword arguments that can be used in the external sampler
+    hard_exit: bool
+        Whether the implemented sampler exits hard (:code:`os._exit` rather
+        than :code:`sys.exit`). The latter can be escaped as :code:`SystemExit`.
+        The former cannot.
 
     Raises
     ======
@@ -185,6 +189,7 @@ class Sampler(object):
 
     default_kwargs = dict()
     npool_equiv_kwargs = ["queue_size", "threads", "nthreads", "npool", "cores"]
+    hard_exit = False
 
     def __init__(
         self,
@@ -681,12 +686,19 @@ class Sampler(object):
         """
         Make sure that if a pool of jobs is running only the parent tries to
         checkpoint and exit. Only the parent has a 'pool' attribute.
+
+        For samplers that must hard exit (typically due to non-Python process)
+        use :code:`os._exit` that cannot be excepted. Other samplers exiting
+        can be caught as a :code:`SystemExit`.
         """
         if self.npool == 1 or getattr(self, "pool", None) is not None:
             self._log_interruption(signum=signum)
             self.write_current_state()
             self._close_pool()
-            sys.exit(self.exit_code)
+            if self.hard_exit:
+                os._exit(self.exit_code)
+            else:
+                sys.exit(self.exit_code)
 
     def _close_pool(self):
         if getattr(self, "pool", None) is not None:

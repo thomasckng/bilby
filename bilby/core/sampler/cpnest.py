@@ -6,7 +6,7 @@ from numpy.lib.recfunctions import structured_to_unstructured
 from pandas import DataFrame
 
 from ..utils import check_directory_exists_and_if_not_mkdir, logger
-from .base_sampler import NestedSampler
+from .base_sampler import NestedSampler, signal_wrapper
 from .proposal import JumpProposalCycle, Sample
 
 
@@ -52,6 +52,7 @@ class Cpnest(NestedSampler):
         proposals=None,
         n_periodic_checkpoint=8000,
     )
+    hard_exit = True
 
     def _translate_kwargs(self, kwargs):
         if "nlive" not in kwargs:
@@ -66,6 +67,7 @@ class Cpnest(NestedSampler):
         if "seed" not in kwargs:
             logger.warning("No seed provided, cpnest will use 1234.")
 
+    @signal_wrapper
     def run_sampler(self):
         from cpnest import CPNest
         from cpnest import model as cpmodel
@@ -123,13 +125,8 @@ class Cpnest(NestedSampler):
                 self.kwargs.pop(kwarg)
         try:
             out.run()
-        except SystemExit as e:
-            import sys
-
-            logger.info(
-                f"Caught exit code {e.args[0]}, exiting with signal {self.exit_code}"
-            )
-            sys.exit(self.exit_code)
+        except SystemExit:
+            self.write_current_state_and_exit()
 
         if self.plot:
             out.plot()
