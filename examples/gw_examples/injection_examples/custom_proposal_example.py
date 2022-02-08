@@ -8,10 +8,12 @@ Due to how cpnest creates parallel processes, the multiprocessing start method
 needs to be set on some operating systems.
 """
 import multiprocessing
+
 multiprocessing.set_start_method("fork")  # noqa
 
-import bilby.gw.sampler.proposal
 import numpy as np
+
+import bilby.gw.sampler.proposal
 from bilby.core.sampler import proposal
 
 # The set up here is the same as in fast_tutorial.py. Look there for descriptive explanations.

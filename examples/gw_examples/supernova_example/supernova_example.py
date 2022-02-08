@@ -11,6 +11,7 @@ For this example we use `PyMultiNest`, this can be installed using
 conda install -c conda-forge pymultinest
 """
 import numpy as np
+
 import bilby
 
 # Set the duration and sampling frequency of the data segment that we're going

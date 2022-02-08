@@ -4,6 +4,7 @@ This example demonstrates how to simulate some data, add an injected signal
 and plot the data.
 """
 import numpy as np
+
 from bilby.gw.detector import get_empty_interferometer
 from bilby.gw.source import lal_binary_black_hole
 from bilby.gw.waveform_generator import WaveformGenerator

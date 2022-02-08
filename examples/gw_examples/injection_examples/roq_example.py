@@ -8,12 +8,13 @@ This requires files specifying the appropriate basis weights.
 These aren't shipped with Bilby, but are available on LDG clusters and
 from the public repository https://git.ligo.org/lscsoft/ROQ_data.
 
-We also reweight the result using the regular waveform mdoel to check how
+We also reweight the result using the regular waveform model to check how
 correct the ROQ result is.
 """
 
-import bilby
 import numpy as np
+
+import bilby
 
 outdir = "outdir"
 label = "roq"

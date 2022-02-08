@@ -3,8 +3,9 @@
 Tutorial to demonstrate running parameter estimation on a sine gaussian
 injected signal.
 """
-import bilby
 import numpy as np
+
+import bilby
 
 # Set the duration and sampling frequency of the data segment that we're going
 # to inject the signal into

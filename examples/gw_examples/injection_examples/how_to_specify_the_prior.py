@@ -4,8 +4,9 @@ Tutorial to demonstrate how to specify the prior distributions used for
 parameter estimation.
 """
 
-import bilby
 import numpy as np
+
+import bilby
 
 duration = 4
 sampling_frequency = 1024

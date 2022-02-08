@@ -2,8 +2,9 @@
 """
 A script to demonstrate how to use your own source model
 """
-import bilby
 import numpy as np
+
+import bilby
 
 # First set up logging and some output directories and labels
 outdir = "outdir"
@@ -72,13 +73,17 @@ ifos.set_strain_data_from_power_spectral_densities(
     start_time=injection_parameters["geocent_time"] - 3,
 )
 ifos.inject_signal(
-    waveform_generator=waveform_generator, parameters=injection_parameters, raise_error=False
+    waveform_generator=waveform_generator,
+    parameters=injection_parameters,
+    raise_error=False,
 )
 
 # Here we define the priors for the search. We use the injection parameters
 # except for the amplitude, f0, and geocent_time
 prior = injection_parameters.copy()
-prior["amplitude"] = bilby.core.prior.LogUniform(minimum=1e-25, maximum=1e-21, latex_label="$\\mathcal{A}$")
+prior["amplitude"] = bilby.core.prior.LogUniform(
+    minimum=1e-25, maximum=1e-21, latex_label="$\\mathcal{A}$"
+)
 prior["f0"] = bilby.core.prior.Uniform(90, 110, latex_label="$f_{0}$")
 
 likelihood = bilby.gw.likelihood.GravitationalWaveTransient(

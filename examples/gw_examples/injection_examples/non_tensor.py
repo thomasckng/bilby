@@ -6,8 +6,9 @@ allowed in general relativity.
 We adapt the sine-Gaussian burst model to include vector polarizations with an
 unknown contribution from the vector modes.
 """
-import bilby
 import numpy as np
+
+import bilby
 
 
 def vector_tensor_sine_gaussian(frequency_array, hrss, Q, frequency, epsilon):

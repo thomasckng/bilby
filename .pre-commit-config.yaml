@@ -5,11 +5,11 @@ repos:
     -   id: check-merge-conflict # prevent committing files with merge conflicts
     -   id: flake8 # checks for flake8 errors
 -   repo: https://github.com/psf/black
-    rev: 21.12b0
+    rev: 22.1.0
     hooks:
       - id: black
         language_version: python3
-        files: '(^bilby/bilby_mcmc/|^examples/gw_examples/injection_examples/)'
+        files: '(^bilby/bilby_mcmc/|^examples/gw_examples/injection_examples/|^examples/gw_examples/supernova_example/)'
 -   repo: https://github.com/codespell-project/codespell
     rev: v2.1.0
     hooks:
@@ -20,4 +20,4 @@ repos:
     hooks:
     -   id: isort # sort imports alphabetically and separates import into sections
         args: [-w=88, -m=3, -tc, -sp=setup.cfg ]
-        files: '(^bilby/bilby_mcmc/|^examples/gw_examples/injection_examples/)'
+        files: '(^bilby/bilby_mcmc/|^examples/gw_examples/injection_examples/|^examples/gw_examples/supernova_example/)'
