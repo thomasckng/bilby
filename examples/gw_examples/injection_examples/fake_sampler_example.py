@@ -1,6 +1,14 @@
 #!/usr/bin/env python
 """
-Read ROQ posterior and calculate full likelihood at same parameter space points.
+Demonstration of how to use the :code:`bilby.core.sampler.FakeSampler` to
+reweight a computationally cheap analysis to a more expensive one.
+
+For this example, we simulate a signal using our high fidelity model
+(:code:`IMRPhenomXPHM`) and analyze it using a model with higher-order
+emission modes included (:code:`IMRPhenomXP`).
+We then, reweight the result of the first step to obtain posteriors and
+evidence estimates for the more expensive model.
+We additionally change the prior for the second stage, because we can.
 """
 
 import numpy as np
@@ -101,6 +109,7 @@ result_1 = bilby.run_sampler(
     save="hdf5",
 )
 
+# update the waveform approximant to use our high-fidelity model
 waveform_generator.waveform_arguments["waveform_approximant"] = "IMRPhenomXPHM"
 
 likelihood_2 = bilby.gw.GravitationalWaveTransient(
@@ -108,6 +117,10 @@ likelihood_2 = bilby.gw.GravitationalWaveTransient(
 )
 
 sample_file = f"{result_1.outdir}/{result_1.label}_result.hdf5"
+
+# update the mass prior to be uniform in component masses
+priors["chirp_mass"] = bilby.gw.prior.UniformInComponentsChirpMass(30, 50)
+priors["mass_ratio"] = bilby.gw.prior.UniformInComponentsMassRatio(0.05, 0.25)
 
 result_2 = bilby.run_sampler(
     likelihood=likelihood_2,

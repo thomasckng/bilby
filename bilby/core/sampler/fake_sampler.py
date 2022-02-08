@@ -10,8 +10,8 @@ from ..utils.plotting import latex_plot_format
 
 class FakeSampler(Sampler):
     r"""
-    A "fake" sampler that evaluates the likelihood at a list of
-    configurations read from a posterior data file.
+    A "fake" sampler that evaluates the likelihood and prior for the posterior
+    samples from a previous analysis and reweights the results.
 
     See base class for parameters. Added parameters are described below.
 
@@ -40,10 +40,16 @@ class FakeSampler(Sampler):
     The posterior samples are rejection sampled, i.e., kept with probability
     :math:`w_{i}`.
 
+    To disable likelihood reweighting pass :code:`Likelihood()`, i.e., an
+    instance of the base likelihood class.
+
     Parameters
     ==========
     sample_file: str
         A string pointing to the posterior data file to be loaded.
+    reweight_likelihood: bool
+        Whether to perform likelihood reweighting, default=True. This should
+        be set to True if just the prior should be reweighted.
     """
 
     default_kwargs = dict(verbose=True)
@@ -56,6 +62,7 @@ class FakeSampler(Sampler):
         outdir="outdir",
         label="label",
         plot=False,
+        reweight_likelihood=True,
         **kwargs,
     ):
         kwargs["use_ratio"] = False
@@ -71,7 +78,10 @@ class FakeSampler(Sampler):
         self._read_parameter_list_from_file(sample_file)
         self.result.outdir = outdir
         self.result.label = label
-        self.changed_priors = self._old_result.priors != priors
+        self.changed_priors = self._old_result.priors != priors and priors is not None
+        if self.changed_priors:
+            self.result.priors = priors
+        self.reweight_likelihood = reweight_likelihood
 
     def _read_parameter_list_from_file(self, sample_file):
         """Read a list of sampling parameters from file.
@@ -91,17 +101,17 @@ class FakeSampler(Sampler):
         for ii in np.arange(posterior.shape[0]):
             sample = posterior.iloc[ii]
 
-            self.likelihood.parameters = sample.to_dict()
             old_ln_prob = old_ln_likelihoods[ii]
-            if self.result.use_ratio:
-                new_ln_prob = self.likelihood.log_likelihood_ratio()
+            if self.reweight_likelihood:
+                theta = [sample[key] for key in self.search_parameter_keys]
+                new_ln_prob = self.log_likelihood(theta)
             else:
-                new_ln_prob = self.likelihood.log_likelihood()
+                new_ln_prob = old_ln_prob
             likelihood_ratios.append(new_ln_prob)
             sample.log_likelihood = new_ln_prob
             if self.changed_priors:
-                old_ln_prob += self._old_result.priors.ln_prob(sample)
-                new_ln_prob += self.priors.ln_prob(sample)
+                old_ln_prob += self._old_result.priors.ln_prob(dict(sample))
+                new_ln_prob += self.priors.ln_prob(dict(sample))
             ln_weights.append(new_ln_prob - old_ln_prob)
 
             logger.debug(
