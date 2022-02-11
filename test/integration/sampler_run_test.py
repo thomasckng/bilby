@@ -129,7 +129,7 @@ class TestRunningSamplers(unittest.TestCase):
 
     def _run_with_signal_handling(self, sampler, pool_size=1):
         pytest.importorskip(sampler_imports.get(sampler, sampler))
-        if bilby.core.sampler.IMPLEMENTED_SAMPLERS[sampler].hard_exit:
+        if bilby.core.sampler.IMPLEMENTED_SAMPLERS[sampler.lower()].hard_exit:
             pytest.skip(f"{sampler} hard exits, can't test signal handling.")
         pid = os.getpid()
         print(sampler)
@@ -151,7 +151,8 @@ class TestRunningSamplers(unittest.TestCase):
 
         with self.assertRaises(SystemExit):
             try:
-                self._run_sampler(sampler=sampler, pool_size=pool_size, exit_code=5)
+                while True:
+                    self._run_sampler(sampler=sampler, pool_size=pool_size, exit_code=5)
             except SystemExit as error:
                 self.assertEqual(error.code, 5)
                 raise

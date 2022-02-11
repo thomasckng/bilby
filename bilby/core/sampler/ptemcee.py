@@ -247,6 +247,22 @@ class Ptemcee(MCMCSampler):
             logger.warning(f"Using betas {betas}")
             self.kwargs["betas"] = betas
 
+        self.iteration = 0
+        self.chain_array = self.get_zero_chain_array()
+        self.log_likelihood_array = self.get_zero_array()
+        self.log_posterior_array = self.get_zero_array()
+        self.beta_list = list()
+        self.tau_list = list()
+        self.tau_list_n = list()
+        self.Q_list = list()
+        self.time_per_check = list()
+
+        self.nburn = np.nan
+        self.thin = np.nan
+        self.tau_int = np.nan
+        self.nsamples_effective = 0
+        self.discard = 0
+
     @property
     def sampler_function_kwargs(self):
         """Kwargs passed to samper.sampler()"""
@@ -423,11 +439,11 @@ class Ptemcee(MCMCSampler):
             self.chain_array = self.get_zero_chain_array()
             self.log_likelihood_array = self.get_zero_array()
             self.log_posterior_array = self.get_zero_array()
-            self.beta_list = []
-            self.tau_list = []
-            self.tau_list_n = []
-            self.Q_list = []
-            self.time_per_check = []
+            self.beta_list = list()
+            self.tau_list = list()
+            self.tau_list_n = list()
+            self.Q_list = list()
+            self.time_per_check = list()
             self.pos0 = self.get_pos0()
 
         return self.sampler
