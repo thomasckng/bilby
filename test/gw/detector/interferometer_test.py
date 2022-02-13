@@ -1,16 +1,11 @@
 import unittest
+from unittest import mock
 
 import lal
 import lalsimulation
-import pytest
-from packaging import version
 from shutil import rmtree
 
-import deepdish as dd
-import mock
 import numpy as np
-from mock import MagicMock, patch
-import pandas
 
 import bilby
 
@@ -56,7 +51,7 @@ class TestInterferometer(unittest.TestCase):
         self.injection_polarizations["plus"] = np.random.random(4097)
         self.injection_polarizations["cross"] = np.random.random(4097)
 
-        self.waveform_generator = MagicMock()
+        self.waveform_generator = mock.MagicMock()
         self.wg_polarizations = dict(
             plus=np.random.random(4097), cross=np.random.random(4097)
         )
@@ -111,8 +106,8 @@ class TestInterferometer(unittest.TestCase):
             )
 
     def test_get_detector_response_default_behaviour(self):
-        self.ifo.antenna_response = MagicMock(return_value=1)
-        self.ifo.time_delay_from_geocenter = MagicMock(return_value=0)
+        self.ifo.antenna_response = mock.MagicMock(return_value=1)
+        self.ifo.time_delay_from_geocenter = mock.MagicMock(return_value=0)
         self.ifo.epoch = 0
         self.minimum_frequency = 10
         self.maximum_frequency = 20
@@ -127,8 +122,8 @@ class TestInterferometer(unittest.TestCase):
         )
 
     def test_get_detector_response_with_dt(self):
-        self.ifo.antenna_response = MagicMock(return_value=1)
-        self.ifo.time_delay_from_geocenter = MagicMock(return_value=0)
+        self.ifo.antenna_response = mock.MagicMock(return_value=1)
+        self.ifo.time_delay_from_geocenter = mock.MagicMock(return_value=0)
         self.ifo.epoch = 1
         self.minimum_frequency = 10
         self.maximum_frequency = 20
@@ -145,8 +140,8 @@ class TestInterferometer(unittest.TestCase):
         self.assertTrue(np.allclose(abs(expected_response), abs(response)))
 
     def test_get_detector_response_multiple_modes(self):
-        self.ifo.antenna_response = MagicMock(return_value=1)
-        self.ifo.time_delay_from_geocenter = MagicMock(return_value=0)
+        self.ifo.antenna_response = mock.MagicMock(return_value=1)
+        self.ifo.time_delay_from_geocenter = mock.MagicMock(return_value=0)
         self.ifo.epoch = 0
         self.minimum_frequency = 10
         self.maximum_frequency = 20
@@ -220,7 +215,7 @@ class TestInterferometer(unittest.TestCase):
                 injection_polarizations=self.injection_polarizations,
             )
 
-    @patch.object(bilby.core.utils.logger, "warning")
+    @mock.patch.object(bilby.core.utils.logger, "warning")
     def test_inject_signal_outside_segment_logs_warning(self, m):
         self.parameters["geocent_time"] = 24345.0
         self.ifo.get_detector_response = lambda x, params: x["plus"] + x["cross"]
@@ -246,7 +241,7 @@ class TestInterferometer(unittest.TestCase):
             )
         )
 
-    @patch.object(
+    @mock.patch.object(
         bilby.gw.detector.Interferometer, "inject_signal_from_waveform_generator"
     )
     def test_inject_signal_with_waveform_generator_correct_call(self, m):
@@ -289,7 +284,7 @@ class TestInterferometer(unittest.TestCase):
             np.array_equal(expected, self.ifo.strain_data._frequency_domain_strain)
         )
 
-    @patch.object(
+    @mock.patch.object(
         bilby.gw.detector.Interferometer, "inject_signal_from_waveform_polarizations"
     )
     def test_inject_signal_with_injection_polarizations_and_waveform_generator(self, m):
@@ -364,28 +359,6 @@ class TestInterferometer(unittest.TestCase):
             )
         )
         self.assertEqual(expected, repr(self.ifo))
-
-    pandas_version_test = version.parse(pandas.__version__) >= version.parse("1.2.0")
-    skip_reason = "Deepdish requires pandas < 1.2"
-
-    @pytest.mark.skipif(pandas_version_test, reason=skip_reason)
-    def test_to_and_from_hdf5_loading(self):
-        self.ifo.to_hdf5(outdir="outdir", label="test")
-        filename = self.ifo._filename_from_outdir_label_extension(
-            outdir="outdir", label="test", extension="h5"
-        )
-        recovered_ifo = bilby.gw.detector.Interferometer.from_hdf5(filename)
-        self.assertEqual(self.ifo, recovered_ifo)
-
-    @pytest.mark.skipif(pandas_version_test, reason=skip_reason)
-    def test_to_and_from_hdf5_wrong_class(self):
-        bilby.core.utils.check_directory_exists_and_if_not_mkdir("outdir")
-        dd.io.save("./outdir/psd.h5", self.power_spectral_density)
-        filename = self.ifo._filename_from_outdir_label_extension(
-            outdir="outdir", label="psd", extension="h5"
-        )
-        with self.assertRaises(TypeError):
-            bilby.gw.detector.Interferometer.from_hdf5(filename)
 
     def test_to_and_from_pkl_loading(self):
         self.ifo.to_pickle(outdir="outdir", label="test")
