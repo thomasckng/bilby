@@ -1,5 +1,4 @@
 import random
-from collections import OrderedDict
 from inspect import isclass
 
 import numpy as np
@@ -7,7 +6,8 @@ import numpy as np
 from ..prior import Uniform
 
 
-class Sample(OrderedDict):
+class Sample(dict):
+
     def __init__(self, dictionary=None):
         if dictionary is None:
             dictionary = dict()

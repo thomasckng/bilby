@@ -1,7 +1,7 @@
 import datetime
 import inspect
 import sys
-from collections import OrderedDict
+import datetime
 
 import bilby
 from bilby.bilby_mcmc import Bilby_MCMC
@@ -160,12 +160,12 @@ def run_sampler(
 
     _check_marginalized_parameters_not_sampled(likelihood, priors)
 
-    if type(priors) in [dict, OrderedDict]:
+    if type(priors) == dict:
         priors = PriorDict(priors)
     elif isinstance(priors, PriorDict):
         pass
     else:
-        raise ValueError("Input priors not understood")
+        raise ValueError("Input priors not understood should be dict or PriorDict")
 
     priors.fill_priors(likelihood, default_priors_file=default_priors_file)
 
