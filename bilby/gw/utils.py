@@ -1,5 +1,6 @@
 import json
 import os
+from functools import lru_cache
 from math import fmod
 
 import numpy as np
@@ -210,7 +211,7 @@ def noise_weighted_inner_product(aa, bb, power_spectral_density, duration):
         duration of the data
 
     Returns
-    ======
+    =======
     Noise-weighted inner product.
     """
 
@@ -701,6 +702,7 @@ def lalsim_SimInspiralTransformPrecessingNewInitialConditions(
     return SimInspiralTransformPrecessingNewInitialConditions(*args_list)
 
 
+@lru_cache(maxsize=10)
 def lalsim_GetApproximantFromString(waveform_approximant):
     from lalsimulation import GetApproximantFromString
     if isinstance(waveform_approximant, str):
@@ -799,6 +801,7 @@ def lalsim_SimInspiralChooseFDWaveform(
     return SimInspiralChooseFDWaveform(*args, waveform_dictionary, approximant)
 
 
+@lru_cache(maxsize=10)
 def _get_lalsim_approximant(approximant):
     if isinstance(approximant, int):
         pass
