@@ -4,6 +4,7 @@ from ..core import utils
 from ..core.series import CoupledTimeAndFrequencySeries
 from ..core.utils import PropertyAccessor
 from .conversion import convert_to_lal_binary_black_hole_parameters
+from .utils import lalsim_GetApproximantFromString
 
 
 class WaveformGenerator(object):
@@ -68,6 +69,7 @@ class WaveformGenerator(object):
         if isinstance(parameters, dict):
             self.parameters = parameters
         self._cache = dict(parameters=None, waveform=None, model=None)
+        self.validate_reference_frequency()
         utils.logger.info(
             "Waveform generator initiated with\n"
             "  frequency_domain_source_model: {}\n"
@@ -247,3 +249,12 @@ class WaveformGenerator(object):
             raise AttributeError('Either time or frequency domain source '
                                  'model must be provided.')
         return set(utils.infer_parameters_from_function(model))
+
+    def validate_reference_frequency(self):
+        from lalsimulation import SimInspiralGetSpinFreqFromApproximant
+        waveform_approximant = self.waveform_arguments["waveform_approximant"]
+        waveform_approximant_number = lalsim_GetApproximantFromString(waveform_approximant)
+        LAL_SIM_INSPIRAL_SPINS_FLOW = 1
+        if SimInspiralGetSpinFreqFromApproximant(waveform_approximant_number) == LAL_SIM_INSPIRAL_SPINS_FLOW:
+            if self.waveform_arguments["reference_frequency"] != self.waveform_arguments["minimum_frequency"]:
+                raise ValueError(f"For {waveform_approximant}, reference_frequency must equal minimum_frequency")
