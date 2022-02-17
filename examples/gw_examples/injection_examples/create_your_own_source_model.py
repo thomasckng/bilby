@@ -2,9 +2,8 @@
 """
 A script to demonstrate how to use your own source model
 """
-import numpy as np
-
 import bilby
+import numpy as np
 
 # First set up logging and some output directories and labels
 outdir = "outdir"

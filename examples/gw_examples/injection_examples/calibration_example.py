@@ -7,9 +7,8 @@ We set up the full problem as is required and then just sample over a small
 number of calibration parameters.
 """
 
-import numpy as np
-
 import bilby
+import numpy as np
 
 # Set the duration and sampling frequency of the data segment
 # that we're going to create and inject the signal into.

@@ -7,9 +7,8 @@ This example estimates the masses using a uniform prior in chirp mass,
 mass ratio and redshift.
 The cosmology is according to the Planck 2015 data release.
 """
-import numpy as np
-
 import bilby
+import numpy as np
 
 bilby.core.utils.setup_logger(log_level="info")
 

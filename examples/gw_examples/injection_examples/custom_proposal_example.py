@@ -11,9 +11,8 @@ import multiprocessing
 
 multiprocessing.set_start_method("fork")  # noqa
 
-import numpy as np
-
 import bilby.gw.sampler.proposal
+import numpy as np
 from bilby.core.sampler import proposal
 
 # The set up here is the same as in fast_tutorial.py. Look there for descriptive explanations.

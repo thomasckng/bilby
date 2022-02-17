@@ -4,9 +4,8 @@ Example of how to use the multi-banding method (see Morisaki, (2021) arXiv:
 2104.07813) for a binary neutron star simulated signal in Gaussian noise.
 """
 
-import numpy as np
-
 import bilby
+import numpy as np
 
 outdir = "outdir"
 label = "multibanding"

@@ -12,9 +12,8 @@ We also reweight the result using the regular waveform model to check how
 correct the ROQ result is.
 """
 
-import numpy as np
-
 import bilby
+import numpy as np
 
 outdir = "outdir"
 label = "roq"

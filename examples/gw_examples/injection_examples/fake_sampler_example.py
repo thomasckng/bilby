@@ -3,11 +3,10 @@
 Read ROQ posterior and calculate full likelihood at same parameter space points.
 """
 
+import bilby
 import deepdish as dd
 import matplotlib.pyplot as plt
 import numpy as np
-
-import bilby
 
 
 def make_comparison_histograms(file_full, file_roq):

@@ -6,9 +6,8 @@ noise in two interferometers (LIGO Livingston and Hanford at design
 sensitivity), and then recovered.
 """
 
-import numpy as np
-
 import bilby
+import numpy as np
 
 
 # define the time-domain model

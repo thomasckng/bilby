@@ -8,9 +8,8 @@ This uses the same binary parameters that were used to make Figures 1, 2 & 5 in
 Lower et al. (2018) -> arXiv:1806.05350.
 """
 
-import numpy as np
-
 import bilby
+import numpy as np
 
 duration = 64
 sampling_frequency = 256

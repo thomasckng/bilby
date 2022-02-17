@@ -9,9 +9,8 @@ tidal deformabilities
 """
 
 
-import numpy as np
-
 import bilby
+import numpy as np
 
 # Specify the output directory and the name of the simulation.
 outdir = "outdir"

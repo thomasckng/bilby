@@ -10,9 +10,8 @@ For this example we use `PyMultiNest`, this can be installed using
 
 conda install -c conda-forge pymultinest
 """
-import numpy as np
-
 import bilby
+import numpy as np
 
 # Set the duration and sampling frequency of the data segment that we're going
 # to inject the signal into.

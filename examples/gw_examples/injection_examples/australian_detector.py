@@ -8,10 +8,9 @@ interferometers at Hanford and Livingston.
 This requires :code:`gwinc` to be installed. This is available via conda-forge.
 """
 
+import bilby
 import gwinc
 import numpy as np
-
-import bilby
 
 # Set the duration and sampling frequency of the data segment that we're going
 # to inject the signal into

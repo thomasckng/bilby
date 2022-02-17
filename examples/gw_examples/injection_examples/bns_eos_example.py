@@ -8,9 +8,8 @@ WARNING: The code is extremely slow.
 """
 
 
-import numpy as np
-
 import bilby
+import numpy as np
 from bilby.gw.eos import EOSFamily, TabularEOS
 
 # Specify the output directory and the name of the simulation.

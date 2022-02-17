@@ -6,9 +6,8 @@ one can modify for the study of injected CBC events.
 
 This will take many hours to run.
 """
-import numpy as np
-
 import bilby
+import numpy as np
 
 # Set the duration and sampling frequency of the data segment that we're
 # going to inject the signal into

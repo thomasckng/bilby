@@ -7,10 +7,9 @@ up to three Gaussians.
 
 """
 
+import bilby
 import matplotlib.pyplot as plt
 import numpy as np
-
-import bilby
 
 outdir = "outdir"
 label = "slabspike"
@@ -21,8 +20,8 @@ bilby.utils.check_directory_exists_and_if_not_mkdir(outdir)
 def gaussian(xs, amplitude, mu, sigma):
     return (
         amplitude
-        / np.sqrt(2 * np.pi * sigma ** 2)
-        * np.exp(-0.5 * (xs - mu) ** 2 / sigma ** 2)
+        / np.sqrt(2 * np.pi * sigma**2)
+        * np.exp(-0.5 * (xs - mu) ** 2 / sigma**2)
     )
 
 

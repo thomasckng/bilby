@@ -8,9 +8,8 @@ and distance using a uniform in comoving volume prior on luminosity distance
 between luminosity distances of 100Mpc and 5Gpc, the cosmology is Planck15.
 """
 
-import numpy as np
-
 import bilby
+import numpy as np
 
 # Set the duration and sampling frequency of the data segment that we're
 # going to inject the signal into

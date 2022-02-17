@@ -6,9 +6,8 @@ estimation on an injected signal using time, phase and distance marginalisation.
 We also demonstrate how the posterior distribution for the marginalised
 parameter can be recovered in post-processing.
 """
-import numpy as np
-
 import bilby
+import numpy as np
 
 duration = 4
 sampling_frequency = 1024
