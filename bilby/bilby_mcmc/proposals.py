@@ -986,7 +986,9 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True):
         all_but_cal = [key for key in priors if "recalib" not in key]
         plist = [
             AdaptiveGaussianProposal(priors, weight=small_weight, subset=all_but_cal),
-            DifferentialEvolutionProposal(priors, weight=small_weight, subset=all_but_cal),
+            DifferentialEvolutionProposal(
+                priors, weight=small_weight, subset=all_but_cal
+            ),
         ]
 
         if GMMProposal.check_dependencies(warn=warn) is False:
