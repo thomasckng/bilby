@@ -7,7 +7,6 @@ from ..prior import Uniform
 
 
 class Sample(dict):
-
     def __init__(self, dictionary=None):
         if dictionary is None:
             dictionary = dict()

@@ -1,7 +1,6 @@
 import datetime
 import inspect
 import sys
-import datetime
 
 import bilby
 from bilby.bilby_mcmc import Bilby_MCMC
