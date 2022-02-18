@@ -59,7 +59,7 @@ sampler_imports = dict(
     dynamic_dynesty="dynesty"
 )
 
-no_pool_test = ["dnest4", "pymultinest", "nestle", "ultranest"]
+no_pool_test = ["dnest4", "pymultinest", "nestle", "ptmcmcsampler", "ultranest"]
 
 
 class TestRunningSamplers(unittest.TestCase):
