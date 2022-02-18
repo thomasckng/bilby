@@ -49,6 +49,7 @@ class PyPolyChord(NestedSampler):
         grade_frac=None,
         nlives={},
     )
+    hard_exit = True
 
     @signal_wrapper
     def run_sampler(self):
