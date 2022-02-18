@@ -1,6 +1,6 @@
 import numpy as np
 
-from .base_sampler import NestedSampler
+from .base_sampler import NestedSampler, signal_wrapper
 
 
 class PyPolyChord(NestedSampler):
@@ -50,6 +50,7 @@ class PyPolyChord(NestedSampler):
         nlives={},
     )
 
+    @signal_wrapper
     def run_sampler(self):
         import pypolychord
         from pypolychord.settings import PolyChordSettings

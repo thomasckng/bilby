@@ -691,7 +691,7 @@ class Sampler(object):
         use :code:`os._exit` that cannot be excepted. Other samplers exiting
         can be caught as a :code:`SystemExit`.
         """
-        if self.npool == 1 or getattr(self, "pool", None) is not None:
+        if self.npool in (1, None) or getattr(self, "pool", None) is not None:
             self._log_interruption(signum=signum)
             self.write_current_state()
             self._close_pool()

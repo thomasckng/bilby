@@ -1,7 +1,7 @@
 import numpy as np
 from pandas import DataFrame
 
-from .base_sampler import NestedSampler
+from .base_sampler import NestedSampler, signal_wrapper
 
 
 class Nestle(NestedSampler):
@@ -59,6 +59,7 @@ class Nestle(NestedSampler):
             self.kwargs.pop("verbose")
         NestedSampler._verify_kwargs_against_default_kwargs(self)
 
+    @signal_wrapper
     def run_sampler(self):
         """Runs Nestle sampler with given kwargs and returns the result
 
@@ -120,3 +121,10 @@ class Nestle(NestedSampler):
         self.result.log_evidence_err = np.nan
         self.calc_likelihood_count()
         return self.result
+
+    def write_current_state(self):
+        """
+        Nestle doesn't support checkpointing so no current state will be
+        written on interrupt.
+        """
+        pass

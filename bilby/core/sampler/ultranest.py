@@ -6,7 +6,7 @@ import numpy as np
 from pandas import DataFrame
 
 from ..utils import logger
-from .base_sampler import NestedSampler, _TemporaryFileSampler
+from .base_sampler import NestedSampler, _TemporaryFileSampler, signal_wrapper
 
 
 class Ultranest(_TemporaryFileSampler, NestedSampler):
@@ -108,9 +108,13 @@ class Ultranest(_TemporaryFileSampler, NestedSampler):
             for equiv in self.npoints_equiv_kwargs:
                 if equiv in kwargs:
                     kwargs["num_live_points"] = kwargs.pop(equiv)
-
         if "verbose" in kwargs and "show_status" not in kwargs:
             kwargs["show_status"] = kwargs.pop("verbose")
+        resume = kwargs.get("resume", False)
+        if resume is True:
+            kwargs["resume"] = "overwrite"
+        elif resume is False:
+            kwargs["resume"] = "overwrite"
 
     def _verify_kwargs_against_default_kwargs(self):
         """Check the kwargs"""
@@ -201,6 +205,7 @@ class Ultranest(_TemporaryFileSampler, NestedSampler):
 
         return init_kwargs
 
+    @signal_wrapper
     def run_sampler(self):
         import ultranest
         import ultranest.stepsampler
@@ -280,3 +285,7 @@ class Ultranest(_TemporaryFileSampler, NestedSampler):
 
         self.result.outputfiles_basename = self.outputfiles_basename
         self.result.sampling_time = datetime.timedelta(seconds=self.total_sampling_time)
+
+    def log_likelihood(self, theta):
+        log_l = super(Ultranest, self).log_likelihood(theta=theta)
+        return np.nan_to_num(log_l)

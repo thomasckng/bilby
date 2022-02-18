@@ -51,13 +51,15 @@ _sampler_kwargs = dict(
     # pymc3=dict(draws=50, tune=50, n_init=250),  removed until testing issue can be resolved
     pymultinest=dict(nlive=100),
     pypolychord=dict(nlive=100),
-    ultranest=dict(nlive=100, resume="overwrite", temporary_directory=False),
+    ultranest=dict(nlive=100, temporary_directory=False),
 )
 
 sampler_imports = dict(
     bilby_mcmc="bilby",
     dynamic_dynesty="dynesty"
 )
+
+no_pool_test = ["dnest4", "pymultinest", "nestle", "ultranest"]
 
 
 class TestRunningSamplers(unittest.TestCase):
@@ -103,9 +105,10 @@ class TestRunningSamplers(unittest.TestCase):
 
     def _run_sampler(self, sampler, pool_size, **extra_kwargs):
         pytest.importorskip(sampler_imports.get(sampler, sampler))
+        if pool_size > 1 and sampler.lower() in no_pool_test:
+            pytest.skip(f"{sampler} cannot be parallelized")
         bilby.core.utils.check_directory_exists_and_if_not_mkdir("outdir")
         kwargs = _sampler_kwargs[sampler]
-        kwargs["resume"] = kwargs.get("resume", False)
         res = bilby.run_sampler(
             likelihood=self.likelihood,
             priors=self.priors,
@@ -131,6 +134,8 @@ class TestRunningSamplers(unittest.TestCase):
         pytest.importorskip(sampler_imports.get(sampler, sampler))
         if bilby.core.sampler.IMPLEMENTED_SAMPLERS[sampler.lower()].hard_exit:
             pytest.skip(f"{sampler} hard exits, can't test signal handling.")
+        if pool_size > 1 and sampler.lower() in no_pool_test:
+            pytest.skip(f"{sampler} cannot be parallelized")
         pid = os.getpid()
         print(sampler)
 
