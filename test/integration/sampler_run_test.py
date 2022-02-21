@@ -1,5 +1,6 @@
 import multiprocessing
 import os
+import sys
 import threading
 import time
 from signal import SIGINT
@@ -136,6 +137,8 @@ class TestRunningSamplers(unittest.TestCase):
             pytest.skip(f"{sampler} hard exits, can't test signal handling.")
         if pool_size > 1 and sampler.lower() in no_pool_test:
             pytest.skip(f"{sampler} cannot be parallelized")
+        if sys.version_info.minor == 8 and sampler.lower == "cpnest":
+            pytest.skip("Pool interrupting broken for cpnest with py3.8")
         pid = os.getpid()
         print(sampler)
 
