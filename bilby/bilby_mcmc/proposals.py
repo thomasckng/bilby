@@ -763,6 +763,114 @@ class FixedJumpProposal(BaseProposal):
         return self.scale * np.random.normal()
 
 
+class FisherMatrixProposal(AdaptiveGaussianProposal):
+    def __init__(
+        self,
+        priors,
+        subset=None,
+        weight=1,
+        log_likelihood=None,
+        update_interval=100,
+        scale_init=1e0,
+    ):
+        super(FisherMatrixProposal, self).__init__(
+            priors, weight, subset, scale_init=scale_init
+        )
+        self.log_likelihood = log_likelihood
+        self.priors = priors
+        self.mean = np.zeros(len(self.parameters))
+        self.update_interval = update_interval
+        self.steps_since_update = update_interval
+
+    def calculate_iFIM(self, sample):
+        FIM = self.calculate_FIM(sample)
+        return np.linalg.inv(FIM)
+
+    def calculate_FIM(self, sample):
+        N = len(self.parameters)
+        FIM = np.zeros((N, N))
+        for ii, ii_key in enumerate(self.parameters):
+            for jj, jj_key in enumerate(self.parameters):
+                FIM[ii, jj] = -self.get_second_order_derivative(sample, ii_key, jj_key)
+
+        return FIM
+
+    def get_second_order_derivative(self, sample, ii, jj):
+        if ii == jj:
+            return self.get_finite_difference_xx(sample, ii)
+        else:
+            return self.get_finite_difference_xy(sample, ii, jj)
+
+    def get_finite_difference_xx(self, sample, ii):
+        # Sample grid
+        p = self.shift_sample_x(sample, ii, 1)
+        m = self.shift_sample_x(sample, ii, -1)
+
+        dx = p[ii] - m[ii]
+
+        loglp = self.log_likelihood(p)
+        logl = self.log_likelihood(sample)
+        loglm = self.log_likelihood(m)
+
+        return (loglp - 2 * logl + loglm) / dx ** 2
+
+    def get_finite_difference_xy(self, sample, ii, jj):
+        # Sample grid
+        pp = self.shift_sample_xy(sample, ii, 1, jj, 1)
+        pm = self.shift_sample_xy(sample, ii, 1, jj, -1)
+        mp = self.shift_sample_xy(sample, ii, -1, jj, 1)
+        mm = self.shift_sample_xy(sample, ii, -1, jj, -1)
+
+        dx = pp[ii] - mm[jj]
+        dy = pp[ii] - mm[jj]
+
+        loglpp = self.log_likelihood(pp)
+        loglpm = self.log_likelihood(pm)
+        loglmp = self.log_likelihood(mp)
+        loglmm = self.log_likelihood(mm)
+
+        return (loglpp - loglpm - loglmp + loglmm) / (4 * dx * dy)
+
+    def shift_sample_x(self, sample, x_key, x_coef):
+
+        ux = self.priors[x_key].cdf(sample[x_key])
+
+        dux = np.array([1e-5])
+
+        shift_sample = sample.copy()
+        shift_sample[x_key] = self.priors[x_key].rescale(reflect(ux + x_coef * dux))
+        return shift_sample
+
+    def shift_sample_xy(self, sample, x_key, x_coef, y_key, y_coef):
+
+        ux = self.priors[x_key].cdf(sample[x_key])
+        uy = self.priors[y_key].cdf(sample[y_key])
+
+        dux = np.array([1e-5])
+        duy = np.array([1e-5])
+
+        shift_sample = sample.copy()
+        shift_sample[x_key] = self.priors[x_key].rescale(reflect(ux + x_coef * dux))
+        shift_sample[y_key] = self.priors[y_key].rescale(reflect(uy + y_coef * duy))
+        return shift_sample
+
+    def propose(self, chain):
+        sample = chain.current_sample
+        self.update_scale(chain)
+        if self.steps_since_update >= self.update_interval:
+            self.iFIM = self.calculate_iFIM(sample)
+            self.steps_since_update = 0
+
+        jump = self.scale * np.random.multivariate_normal(self.mean, self.iFIM)
+
+        for key, val in zip(self.parameters, jump):
+            sample[key] += val
+
+        log_factor = 0
+        self.steps_since_update += 1
+        return sample, log_factor
+
+
 class BaseGravitationalWaveTransientProposal(BaseProposal):
     def __init__(self, priors, weight=1):
         super(BaseGravitationalWaveTransientProposal, self).__init__(
@@ -972,7 +1080,7 @@ def get_default_ensemble_proposal_cycle(priors):
     return ProposalCycle([EnsembleStretch(priors)])
 
 
-def get_proposal_cycle(string, priors, L1steps=1, warn=True):
+def get_proposal_cycle(string, priors, L1steps=1, warn=True, log_likelihood=None):
     big_weight = 10
     small_weight = 5
     tiny_weight = 0.1
@@ -1006,6 +1114,12 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True):
                 GMMProposal(
                     priors, weight=big_weight, subset=intrinsic, **learning_kwargs
                 ),
+                FisherMatrixProposal(
+                    priors,
+                    weight=big_weight,
+                    subset=intrinsic,
+                    log_likelihood=log_likelihood,
+                ),
             ]
 
         if priors.extrinsic:
@@ -1021,6 +1135,12 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True):
                 GMMProposal(
                     priors, weight=big_weight, subset=extrinsic, **learning_kwargs
                 ),
+                FisherMatrixProposal(
+                    priors,
+                    weight=big_weight,
+                    subset=extrinsic,
+                    log_likelihood=log_likelihood,
+                ),
             ]
 
         if priors.mass:
@@ -1029,6 +1149,12 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True):
                 DifferentialEvolutionProposal(priors, weight=small_weight, subset=mass),
                 GMMProposal(
                     priors, weight=small_weight, subset=mass, **learning_kwargs
+                ),
+                FisherMatrixProposal(
+                    priors,
+                    weight=big_weight,
+                    subset=mass,
+                    log_likelihood=log_likelihood,
                 ),
             ]
 
@@ -1095,6 +1221,12 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True):
             plist.append(
                 NormalizingFlowProposal(priors, weight=big_weight, scale_fits=L1steps)
             )
+        if log_likelihood is not None:
+            plist.append(
+                FisherMatrixProposal(
+                    priors, weight=big_weight, log_likelihood=log_likelihood
+                )
+            )
 
     plist = remove_proposals_using_string(plist, string)
     return ProposalCycle(plist)
@@ -1111,6 +1243,7 @@ def remove_proposals_using_string(plist, string):
         GM=GMMProposal,
         PR=PriorProposal,
         UN=UniformProposal,
+        FM=FisherMatrixProposal,
     )
 
     for element in string.split("no")[1:]:

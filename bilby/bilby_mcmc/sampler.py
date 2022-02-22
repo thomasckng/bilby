@@ -1163,7 +1163,11 @@ class BilbyMCMCSampler(object):
                 warn = False
 
             self.proposal_cycle = proposals.get_proposal_cycle(
-                proposal_cycle, _priors, L1steps=self.chain.L1steps, warn=warn
+                proposal_cycle,
+                _priors,
+                L1steps=self.chain.L1steps,
+                warn=warn,
+                log_likelihood=self.log_likelihood,
             )
         elif isinstance(proposal_cycle, proposals.ProposalCycle):
             self.proposal_cycle = proposal_cycle
