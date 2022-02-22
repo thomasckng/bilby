@@ -764,6 +764,14 @@ class FixedJumpProposal(BaseProposal):
 
 
 class FisherMatrixProposal(AdaptiveGaussianProposal):
+    """Fisher Matrix Proposals
+
+    Uses a finite differencing approach motivated by BayesWave (see, e.g.
+    https://arxiv.org/abs/1410.3835). The inverse Fisher Information Matrix
+    is calculated from the current sample, then proposals are drawn from a
+    multivariate Gaussian and scaled by an adaptive parameter.
+    """
+
     def __init__(
         self,
         priors,
