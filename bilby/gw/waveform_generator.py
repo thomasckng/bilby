@@ -69,7 +69,6 @@ class WaveformGenerator(object):
         if isinstance(parameters, dict):
             self.parameters = parameters
         self._cache = dict(parameters=None, waveform=None, model=None)
-        self.validate_reference_frequency()
         utils.logger.info(
             "Waveform generator initiated with\n"
             "  frequency_domain_source_model: {}\n"
@@ -249,6 +248,13 @@ class WaveformGenerator(object):
             raise AttributeError('Either time or frequency domain source '
                                  'model must be provided.')
         return set(utils.infer_parameters_from_function(model))
+
+
+class LALCBCWaveformGenerator(WaveformGenerator):
+    """ A waveform generator with specific checks for LAL CBC waveforms """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.validate_reference_frequency()
 
     def validate_reference_frequency(self):
         from lalsimulation import SimInspiralGetSpinFreqFromApproximant
