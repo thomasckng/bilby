@@ -3,6 +3,7 @@ import time
 from abc import ABCMeta, abstractmethod
 
 import numpy as np
+import scipy.linalg
 from scipy.spatial.distance import jensenshannon
 from scipy.stats import gaussian_kde
 
@@ -780,19 +781,27 @@ class FisherMatrixProposal(AdaptiveGaussianProposal):
         log_likelihood=None,
         update_interval=100,
         scale_init=1e0,
+        fd_eps=1e-4,
     ):
         super(FisherMatrixProposal, self).__init__(
             priors, weight, subset, scale_init=scale_init
         )
         self.log_likelihood = log_likelihood
-        self.priors = priors
         self.mean = np.zeros(len(self.parameters))
         self.update_interval = update_interval
         self.steps_since_update = update_interval
+        self.fd_eps = np.atleast_1d(fd_eps)
 
     def calculate_iFIM(self, sample):
         FIM = self.calculate_FIM(sample)
-        return np.linalg.inv(FIM)
+        iFIM = scipy.linalg.inv(FIM)
+
+        # Ensure iFIM is positive definite
+        min_eig = np.min(np.real(np.linalg.eigvals(iFIM)))
+        if min_eig < 0:
+            iFIM -= 10 * min_eig * np.eye(*iFIM.shape)
+
+        return iFIM
 
     def calculate_FIM(self, sample):
         N = len(self.parameters)
@@ -841,25 +850,24 @@ class FisherMatrixProposal(AdaptiveGaussianProposal):
 
     def shift_sample_x(self, sample, x_key, x_coef):
 
-        ux = self.priors[x_key].cdf(sample[x_key])
-
-        dux = np.array([1e-5])
+        vx = sample[x_key]
+        dvx = self.fd_eps * self.prior_width_dict[x_key]
 
         shift_sample = sample.copy()
-        shift_sample[x_key] = self.priors[x_key].rescale(reflect(ux + x_coef * dux))
+        shift_sample[x_key] = vx + x_coef * dvx
         return shift_sample
 
     def shift_sample_xy(self, sample, x_key, x_coef, y_key, y_coef):
 
-        ux = self.priors[x_key].cdf(sample[x_key])
-        uy = self.priors[y_key].cdf(sample[y_key])
+        vx = sample[x_key]
+        vy = sample[y_key]
 
-        dux = np.array([1e-5])
-        duy = np.array([1e-5])
+        dvx = self.fd_eps * self.prior_width_dict[x_key]
+        dvy = self.fd_eps * self.prior_width_dict[y_key]
 
         shift_sample = sample.copy()
-        shift_sample[x_key] = self.priors[x_key].rescale(reflect(ux + x_coef * dux))
-        shift_sample[y_key] = self.priors[y_key].rescale(reflect(uy + y_coef * duy))
+        shift_sample[x_key] = vx + x_coef * dvx
+        shift_sample[y_key] = vy + y_coef * dvy
         return shift_sample
 
     def propose(self, chain):
