@@ -790,7 +790,7 @@ class FisherMatrixProposal(AdaptiveGaussianProposal):
         self.mean = np.zeros(len(self.parameters))
         self.update_interval = update_interval
         self.steps_since_update = update_interval
-        self.fd_eps = np.atleast_1d(fd_eps)
+        self.fd_eps = fd_eps
 
     def calculate_iFIM(self, sample):
         FIM = self.calculate_FIM(sample)
@@ -838,8 +838,8 @@ class FisherMatrixProposal(AdaptiveGaussianProposal):
         mp = self.shift_sample_xy(sample, ii, -1, jj, 1)
         mm = self.shift_sample_xy(sample, ii, -1, jj, -1)
 
-        dx = pp[ii] - mm[jj]
-        dy = pp[ii] - mm[jj]
+        dx = pp[ii] - mm[ii]
+        dy = pp[jj] - mm[jj]
 
         loglpp = self.log_likelihood(pp)
         loglpm = self.log_likelihood(pm)
@@ -855,6 +855,7 @@ class FisherMatrixProposal(AdaptiveGaussianProposal):
 
         shift_sample = sample.copy()
         shift_sample[x_key] = vx + x_coef * dvx
+
         return shift_sample
 
     def shift_sample_xy(self, sample, x_key, x_coef, y_key, y_coef):
