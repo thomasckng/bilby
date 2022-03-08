@@ -1,5 +1,6 @@
 import json
 import os
+from functools import lru_cache
 
 import numpy as np
 from scipy.interpolate import interp1d
@@ -183,7 +184,7 @@ def noise_weighted_inner_product(aa, bb, power_spectral_density, duration):
         duration of the data
 
     Returns
-    ======
+    =======
     Noise-weighted inner product.
     """
 
@@ -303,54 +304,31 @@ def zenith_azimuth_to_ra_dec(zenith, azimuth, geocent_time, ifos):
 
 def get_event_time(event):
     """
-    Get the merger time for known GW events.
-
-    See https://www.gw-openscience.org/catalog/GWTC-1-confident/html/
-    Last update https://arxiv.org/abs/1811.12907:
-
-    - GW150914
-    - GW151012
-    - GW151226
-    - GW170104
-    - GW170608
-    - GW170729
-    - GW170809
-    - GW170814
-    - GW170817
-    - GW170818
-    - GW170823
+    Get the merger time for known GW events using the gwosc package
 
     Parameters
-    ==========
+    ----------
     event: str
-        Event descriptor, this can deal with some prefixes, e.g.,
-        '151012', 'GW151012', 'LVT151012'
+        Event name, e.g. GW150914
 
     Returns
-    =======
+    -------
     event_time: float
         Merger time
-    """
-    event_times = {'150914': 1126259462.4,
-                   '151012': 1128678900.4,
-                   '151226': 1135136350.6,
-                   '170104': 1167559936.6,
-                   '170608': 1180922494.5,
-                   '170729': 1185389807.3,
-                   '170809': 1186302519.8,
-                   '170814': 1186741861.5,
-                   '170817': 1187008882.4,
-                   '170818': 1187058327.1,
-                   '170823': 1187529256.5}
-    if 'GW' or 'LVT' in event:
-        event = event[-6:]
 
+    Raises
+    ------
+    ImportError
+        If the gwosc package is not installed
+    ValueError
+        If the event is not in the gwosc dataset
+    """
     try:
-        event_time = event_times[event[-6:]]
-        return event_time
-    except KeyError:
-        print('Unknown event {}.'.format(event))
-        return None
+        from gwosc import datasets
+    except ImportError:
+        raise ImportError("You do not have the gwosc package installed")
+
+    return datasets.event_gps(event)
 
 
 def get_open_strain_data(
@@ -640,6 +618,7 @@ def lalsim_SimInspiralTransformPrecessingNewInitialConditions(
     return SimInspiralTransformPrecessingNewInitialConditions(*args_list)
 
 
+@lru_cache(maxsize=10)
 def lalsim_GetApproximantFromString(waveform_approximant):
     from lalsimulation import GetApproximantFromString
     if isinstance(waveform_approximant, str):
@@ -738,6 +717,7 @@ def lalsim_SimInspiralChooseFDWaveform(
     return SimInspiralChooseFDWaveform(*args, waveform_dictionary, approximant)
 
 
+@lru_cache(maxsize=10)
 def _get_lalsim_approximant(approximant):
     if isinstance(approximant, int):
         pass

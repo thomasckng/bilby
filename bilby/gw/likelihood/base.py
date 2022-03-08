@@ -378,9 +378,7 @@ class GravitationalWaveTransient(Likelihood):
         elif self.time_marginalization:
             if self.jitter_time:
                 self.parameters['geocent_time'] += self.parameters['time_jitter']
-            d_inner_h_array = np.zeros(
-                len(self.interferometers.frequency_array[0:-1]),
-                dtype=np.complex128)
+            d_inner_h_array = np.zeros(len(self._times), dtype=np.complex128)
 
         elif self.calibration_marginalization:
             d_inner_h_array = np.zeros(self.number_of_response_curves, dtype=np.complex128)
@@ -651,7 +649,7 @@ class GravitationalWaveTransient(Likelihood):
 
     def generate_phase_sample_from_marginalized_likelihood(
             self, signal_polarizations=None):
-        """
+        r"""
         Generate a single sample from the posterior distribution for phase when
         using a likelihood which explicitly marginalises over phase.
 
@@ -937,15 +935,6 @@ class GravitationalWaveTransient(Likelihood):
             "please update the implementation of phase marginalization "
             "to use bilby.gw.utils.ln_i0"
         )
-
-    @staticmethod
-    def _bessel_function_interped(xx):
-        logger.warning(
-            "The _bessel_function_interped method is deprecated and will be removed, "
-            "please update the implementation of phase marginalization "
-            "to use bilby.gw.utils.ln_i0"
-        )
-        return ln_i0(xx) + xx
 
     def _setup_time_marginalization(self):
         self._delta_tc = 2 / self.waveform_generator.sampling_frequency

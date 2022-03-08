@@ -1,13 +1,15 @@
 import unittest
-import pytest
-import sys
+from unittest.mock import MagicMock
 
-from mock import MagicMock
+import pytest
 
 import bilby
 
 
-@pytest.mark.skipif(sys.version_info[1] <= 6, reason="pymc3 is broken in py36")
+@pytest.mark.xfail(
+    raises=AttributeError,
+    reason="Dependency issue with pymc3 causes attribute error on import",
+)
 class TestPyMC3(unittest.TestCase):
     def setUp(self):
         self.likelihood = MagicMock()

@@ -1,8 +1,8 @@
 import os
 import unittest
+from unittest.mock import Mock
 
 import numpy as np
-from mock import Mock
 
 import bilby
 
@@ -66,7 +66,7 @@ class TestPriorDict(unittest.TestCase):
                 name="chirp_mass",
                 minimum=25,
                 maximum=100,
-                latex_label="$\mathcal{M}$",
+                latex_label=r"$\mathcal{M}$",
             ),
             mass_ratio=bilby.core.prior.Uniform(
                 name="mass_ratio",
@@ -176,7 +176,7 @@ class TestPriorDict(unittest.TestCase):
                     name="chirp_mass",
                     minimum=25,
                     maximum=100,
-                    latex_label="$\mathcal{M}$",
+                    latex_label=r"$\mathcal{M}$",
                 ),
                 mass_ratio=bilby.core.prior.Uniform(
                     name="mass_ratio",

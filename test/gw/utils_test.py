@@ -101,23 +101,19 @@ class TestGWUtils(unittest.TestCase):
         self.assertEqual(mfsnr, 25.510869054168282)
 
     def test_get_event_time(self):
+        from urllib3.exceptions import NewConnectionError
         events = [
             "GW150914",
-            "GW151012",
-            "GW151226",
             "GW170104",
-            "GW170608",
-            "GW170729",
-            "GW170809",
-            "GW170814",
-            "GW170817",
-            "GW170818",
-            "GW170823",
         ]
         for event in events:
-            self.assertTrue(isinstance(gwutils.get_event_time(event), float))
+            try:
+                self.assertTrue(isinstance(gwutils.get_event_time(event), float))
+            except NewConnectionError:
+                return
 
-        self.assertTrue(gwutils.get_event_time("GW010290") is None)
+        with self.assertRaises(ValueError):
+            gwutils.get_event_time("GW010290")
 
     def test_read_frame_file(self):
         start_time = 0

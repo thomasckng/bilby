@@ -11,7 +11,7 @@ from ..core.utils import logger, solar_mass, command_line_args
 from ..core.prior import DeltaFunction
 from .utils import lalsim_SimInspiralTransformPrecessingNewInitialConditions
 from .eos.eos import SpectralDecompositionEOS, EOSFamily, IntegrateTOV
-from .cosmology import get_cosmology
+from .cosmology import get_cosmology, z_at_value
 
 
 def redshift_to_luminosity_distance(redshift, cosmology=None):
@@ -27,7 +27,6 @@ def redshift_to_comoving_distance(redshift, cosmology=None):
 @np.vectorize
 def luminosity_distance_to_redshift(distance, cosmology=None):
     from astropy import units
-    from astropy.cosmology import z_at_value
     cosmology = get_cosmology(cosmology)
     return z_at_value(cosmology.luminosity_distance, distance * units.Mpc)
 
@@ -35,7 +34,6 @@ def luminosity_distance_to_redshift(distance, cosmology=None):
 @np.vectorize
 def comoving_distance_to_redshift(distance, cosmology=None):
     from astropy import units
-    from astropy.cosmology import z_at_value
     cosmology = get_cosmology(cosmology)
     return z_at_value(cosmology.comoving_distance, distance * units.Mpc)
 
@@ -176,7 +174,7 @@ def convert_to_lal_binary_black_hole_parameters(parameters):
                 chirp_mass_and_total_mass_to_symmetric_mass_ratio(
                     converted_parameters['chirp_mass'],
                     converted_parameters['total_mass'])
-        if 'symmetric_mass_ratio' in converted_parameters.keys():
+        if 'symmetric_mass_ratio' in converted_parameters.keys() and "mass_ratio" not in converted_parameters:
             converted_parameters['mass_ratio'] =\
                 symmetric_mass_ratio_to_mass_ratio(
                     converted_parameters['symmetric_mass_ratio'])
@@ -653,7 +651,7 @@ def lambda_1_lambda_2_to_lambda_tilde(lambda_1, lambda_2, mass_1, mass_2):
         Mass of less massive neutron star.
 
     Returns
-    ======
+    =======
     lambda_tilde: float
         Dominant tidal term.
     """
@@ -1169,6 +1167,7 @@ def compute_snrs(sample, likelihood, npool=1):
                 )
                 new_samples = pool.map(_compute_snrs, tqdm(fill_args, file=sys.stdout))
                 pool.close()
+                pool.join()
             else:
                 new_samples = [_compute_snrs(xx) for xx in tqdm(fill_args, file=sys.stdout)]
 
@@ -1309,6 +1308,7 @@ def generate_posterior_samples_from_marginalized_likelihood(
 
     if pool is not None:
         pool.close()
+        pool.join()
 
     new_samples = np.concatenate(
         [np.array(val) for key, val in cached_samples_dict.items() if key != "_samples"]
