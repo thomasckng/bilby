@@ -4,7 +4,6 @@ An example of how to use bilby to perform parameter estimation for hyper params
 """
 import matplotlib.pyplot as plt
 import numpy as np
-
 from bilby.core.likelihood import GaussianLikelihood
 from bilby.core.prior import Uniform
 from bilby.core.result import make_pp_plot
@@ -78,8 +77,8 @@ fig2.savefig("outdir/hyper_parameter_combined_posteriors.png")
 
 def hyper_prior(dataset, mu, sigma):
     return (
-        np.exp(-((dataset["c0"] - mu) ** 2) / (2 * sigma ** 2))
-        / (2 * np.pi * sigma ** 2) ** 0.5
+        np.exp(-((dataset["c0"] - mu) ** 2) / (2 * sigma**2))
+        / (2 * np.pi * sigma**2) ** 0.5
     )
 
 

@@ -43,9 +43,9 @@ class PTMCMCSampler(MCMCSampler):
 
     default_kwargs = {
         "p0": None,
-        "Niter": 2 * 10 ** 4 + 1,
-        "neff": 10 ** 4,
-        "burn": 5 * 10 ** 3,
+        "Niter": 2 * 10**4 + 1,
+        "neff": 10**4,
+        "burn": 5 * 10**3,
         "verbose": True,
         "ladder": None,
         "Tmin": 1,
@@ -83,8 +83,6 @@ class PTMCMCSampler(MCMCSampler):
         use_ratio=False,
         plot=False,
         skip_import_verification=False,
-        pos0=None,
-        burn_in_fraction=0.25,
         **kwargs,
     ):
 
@@ -99,7 +97,10 @@ class PTMCMCSampler(MCMCSampler):
             **kwargs,
         )
 
-        self.p0 = self.get_random_draw_from_prior()
+        if self.kwargs["p0"] is None:
+            self.p0 = self.get_random_draw_from_prior()
+        else:
+            self.p0 = self.kwargs["p0"]
         self.likelihood = likelihood
         self.priors = priors
 
