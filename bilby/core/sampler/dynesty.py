@@ -96,8 +96,9 @@ class Dynesty(NestedSampler):
         `ndim * 10` can be a reasonable rule of thumb for new problems.
     dlogz: float, (0.1)
         Stopping criteria
-    verbose: Bool
-        If true, print information information about the convergence during
+    print_progress: Bool
+        If true, print information information about the convergence during.
+        `verbose` has the same effect.
     check_point: bool,
         If true, use check pointing.
     check_point_plot: bool,
@@ -152,7 +153,6 @@ class Dynesty(NestedSampler):
         maxcall=None,
         logl_max=np.inf,
         add_live=True,
-        print_progress=True,
         save_bounds=False,
         n_effective=None,
         maxmcmc=5000,
@@ -265,7 +265,7 @@ class Dynesty(NestedSampler):
         if self.kwargs["print_func"] is None:
             self.kwargs["print_func"] = self._print_func
             print_method = self.kwargs["print_method"]
-            if print_method == "tqdm":
+            if print_method == "tqdm" and self.kwargs["print_progress"]:
                 self.pbar = tqdm(file=sys.stdout)
             elif "interval" in print_method:
                 self._last_print_time = datetime.datetime.now()
@@ -422,7 +422,7 @@ class Dynesty(NestedSampler):
         self._close_pool()
 
         # Flushes the output to force a line break
-        if self.kwargs["verbose"] and self.kwargs["print_method"] == "tqdm":
+        if self.kwargs["print_progress"] and self.kwargs["print_method"] == "tqdm":
             self.pbar.close()
             print("")
 

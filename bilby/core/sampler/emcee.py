@@ -40,6 +40,8 @@ class Emcee(MCMCSampler):
         The number of autocorrelation times to discard as burn-in
     a: float (2)
         The proposal scale factor
+    verbose: bool
+        Whether to print diagnostic information during the analysis
 
     """
 
@@ -99,6 +101,7 @@ class Emcee(MCMCSampler):
         self.nburn = nburn
         self.burn_in_fraction = burn_in_fraction
         self.burn_in_act = burn_in_act
+        self.verbose = kwargs.get("verbose", True)
 
     def _check_version(self):
         import emcee
@@ -398,12 +401,14 @@ class Emcee(MCMCSampler):
             sampler_function_kwargs["p0"] = self.pos0
 
         # main iteration loop
-        for sample in tqdm(
-            self.sampler.sample(iterations=iterations, **sampler_function_kwargs),
-            total=iterations,
-        ):
+        iterator = self.sampler.sample(iterations=iterations, **sampler_function_kwargs)
+        if self.verbose:
+            iterator = tqdm(iterator, total=iterations)
+        for sample in iterator:
             self.write_chains_to_file(sample)
-        self._close_pool()
+        if self.verbose:
+            iterator.close()
+        self.checkpoint_info()
         self.write_current_state()
 
         self.result.sampler_output = np.nan

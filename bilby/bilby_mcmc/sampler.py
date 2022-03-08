@@ -112,6 +112,8 @@ class Bilby_MCMC(MCMCSampler):
     evidence_method: str, [stepping_stone, thermodynamic]
         The evidence calculation method to use. Defaults to stepping_stone, but
         the results of all available methods are stored in the ln_z_dict.
+    verbose: bool
+        Whether to print diagnostic output during the run.
 
     """
 
@@ -156,6 +158,7 @@ class Bilby_MCMC(MCMCSampler):
         diagnostic=False,
         resume=True,
         exit_code=130,
+        verbose=False,
         **kwargs,
     ):
 
@@ -192,6 +195,7 @@ class Bilby_MCMC(MCMCSampler):
         self.resume_file = "{}/{}_resume.pickle".format(self.outdir, self.label)
 
         self.verify_configuration()
+        self.verbose = verbose
 
     def verify_configuration(self):
         if self.convergence_inputs.burn_in_nact / self.kwargs["target_nsamples"] > 0.1:
@@ -457,7 +461,8 @@ class Bilby_MCMC(MCMCSampler):
             rse = 100 * count / nsamples
             msg += f"|rse={rse:0.2f}%"
 
-        print(msg, flush=True)
+        if self.verbose:
+            print(msg, flush=True)
 
     def print_per_proposal(self):
         logger.info("Zero-temperature proposals:")
@@ -549,7 +554,7 @@ class BilbyPTMCMCSampler(object):
         elif pt_inputs.Tmax_from_SNR is not None:
             ndim = len(self._sampling_helper.priors.non_fixed_keys)
             target_hot_likelihood = ndim / 2
-            Tmax = pt_inputs.Tmax_from_SNR ** 2 / (2 * target_hot_likelihood)
+            Tmax = pt_inputs.Tmax_from_SNR**2 / (2 * target_hot_likelihood)
             betas = np.logspace(0, -np.log10(Tmax), pt_inputs.ntemps)
         else:
             raise SamplerError("Unable to set temperature ladder from inputs")
