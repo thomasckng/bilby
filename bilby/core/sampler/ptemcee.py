@@ -83,7 +83,7 @@ class Ptemcee(MCMCSampler):
         the Gelman-Rubin statistic).
     min_tau: int, (1)
         A minimum tau (autocorrelation time) to accept.
-    check_point_deltaT: float, (600)
+    check_point_delta_t: float, (600)
         The period with which to checkpoint (in seconds).
     threads: int, (1)
         If threads > 1, a MultiPool object is setup and used.
@@ -161,7 +161,7 @@ class Ptemcee(MCMCSampler):
         gradient_mean_log_posterior=0.1,
         Q_tol=1.02,
         min_tau=1,
-        check_point_deltaT=600,
+        check_point_delta_t=600,
         threads=1,
         exit_code=77,
         plot=False,
@@ -190,7 +190,7 @@ class Ptemcee(MCMCSampler):
 
         # Checkpointing inputs
         self.resume = resume
-        self.check_point_deltaT = check_point_deltaT
+        self.check_point_delta_t = check_point_delta_t
         self.check_point_plot = check_point_plot
         self.resume_file = f"{self.outdir}/{self.label}_checkpoint_resume.pickle"
 
@@ -571,7 +571,7 @@ class Ptemcee(MCMCSampler):
             else:
                 last_checkpoint_s = np.sum(self.time_per_check)
 
-            if last_checkpoint_s > self.check_point_deltaT:
+            if last_checkpoint_s > self.check_point_delta_t:
                 self.write_current_state(plot=self.check_point_plot)
 
         # Run a final checkpoint to update the plots and samples
