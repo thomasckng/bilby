@@ -153,42 +153,43 @@ class TestInterferometerGeometry(unittest.TestCase):
 
     def test_detector_tensor_with_x_azimuth_update(self):
         _ = self.geometry.detector_tensor
-        with mock.patch("numpy.einsum") as m:
-            m.return_value = 1
+        with mock.patch("bilby_cython.geometry.detector_tensor") as m:
+            m.return_value = 0
             self.geometry.xarm_azimuth = 1
             self.assertEqual(0, self.geometry.detector_tensor)
 
     def test_detector_tensor_with_y_azimuth_update(self):
         _ = self.geometry.detector_tensor
-        with mock.patch("numpy.einsum") as m:
-            m.return_value = 1
+        with mock.patch("bilby_cython.geometry.detector_tensor") as m:
+            m.return_value = 0
             self.geometry.yarm_azimuth = 1
             self.assertEqual(0, self.geometry.detector_tensor)
 
     def test_detector_tensor_with_x_tilt_update(self):
         _ = self.geometry.detector_tensor
-        with mock.patch("numpy.einsum") as m:
-            m.return_value = 1
+        with mock.patch("bilby_cython.geometry.detector_tensor") as m:
+            m.return_value = 0
             self.geometry.xarm_tilt = 1
             self.assertEqual(0, self.geometry.detector_tensor)
 
     def test_detector_tensor_with_y_tilt_update(self):
         _ = self.geometry.detector_tensor
-        with mock.patch("numpy.einsum") as m:
-            m.return_value = 1
+        with mock.patch("bilby_cython.geometry.detector_tensor") as m:
+            m.return_value = 0
             self.geometry.yarm_tilt = 1
             self.assertEqual(0, self.geometry.detector_tensor)
 
     def test_detector_tensor_with_longitude_update(self):
-        with mock.patch("numpy.einsum") as m:
-            m.return_value = 1
+        _ = self.geometry.detector_tensor
+        with mock.patch("bilby_cython.geometry.detector_tensor") as m:
+            m.return_value = 0
             self.geometry.longitude = 1
             self.assertEqual(0, self.geometry.detector_tensor)
 
     def test_detector_tensor_with_latitude_update(self):
-        with mock.patch("numpy.einsum") as m:
-            _ = self.geometry.detector_tensor
-            m.return_value = 1
+        _ = self.geometry.detector_tensor
+        with mock.patch("bilby_cython.geometry.detector_tensor") as m:
+            m.return_value = 0
             self.geometry.latitude = 1
             self.assertEqual(self.geometry.detector_tensor, 0)
 
@@ -197,22 +198,21 @@ class TestInterferometerGeometry(unittest.TestCase):
             self.geometry.unit_vector_along_arm("z")
 
     def test_unit_vector_along_arm_x(self):
-        with mock.patch("numpy.array") as m:
-            m.return_value = 1
-            self.geometry.xarm_tilt = 0
-            self.geometry.xarm_azimuth = 0
-            self.geometry.yarm_tilt = 0
-            self.geometry.yarm_azimuth = 90
-            self.assertAlmostEqual(self.geometry.unit_vector_along_arm("x"), 1)
+        self.geometry.longitude = 0
+        self.geometry.latitude = 0
+        self.geometry.xarm_tilt = 0
+        self.geometry.xarm_azimuth = 0
+        arm = self.geometry.unit_vector_along_arm("x")
+        self.assertTrue(np.allclose(arm, np.array([0, 1, 0])))
 
     def test_unit_vector_along_arm_y(self):
-        with mock.patch("numpy.array") as m:
-            m.return_value = 1
-            self.geometry.xarm_tilt = 0
-            self.geometry.xarm_azimuth = 90
-            self.geometry.yarm_tilt = 0
-            self.geometry.yarm_azimuth = 180
-            self.assertAlmostEqual(self.geometry.unit_vector_along_arm("y"), -1)
+        self.geometry.longitude = 0
+        self.geometry.latitude = 0
+        self.geometry.yarm_tilt = 0
+        self.geometry.yarm_azimuth = 90
+        arm = self.geometry.unit_vector_along_arm("y")
+        print(arm)
+        self.assertTrue(np.allclose(arm, np.array([0, 0, 1])))
 
     def test_repr(self):
         expected = (
