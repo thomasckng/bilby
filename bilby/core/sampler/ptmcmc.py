@@ -4,7 +4,7 @@ import shutil
 import numpy as np
 
 from ..utils import logger
-from .base_sampler import MCMCSampler, SamplerNotInstalledError
+from .base_sampler import MCMCSampler, SamplerNotInstalledError, signal_wrapper
 
 
 class PTMCMCSampler(MCMCSampler):
@@ -72,6 +72,7 @@ class PTMCMCSampler(MCMCSampler):
         "logp_grad": None,
         "outDir": None,
     }
+    hard_exit = True
 
     def __init__(
         self,
@@ -176,6 +177,7 @@ class PTMCMCSampler(MCMCSampler):
 
         return PTMCMCSampler
 
+    @signal_wrapper
     def run_sampler(self):
         PTMCMCSampler = self._import_external_sampler()
         sampler = PTMCMCSampler.PTSampler(
@@ -236,3 +238,7 @@ class PTMCMCSampler(MCMCSampler):
         shutil.rmtree(temp_outDir)
 
         return samples, meta, loglike
+
+    def write_current_state(self):
+        """TODO: implement a checkpointing method"""
+        pass

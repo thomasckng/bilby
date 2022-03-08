@@ -1,6 +1,5 @@
 import json
 import os
-from collections import OrderedDict
 
 import numpy as np
 
@@ -352,7 +351,7 @@ class Grid(object):
             'label', 'outdir', 'parameter_names', 'n_dims', 'priors',
             'sample_points', 'ln_likelihood', 'ln_evidence',
             'ln_noise_evidence']
-        dictionary = OrderedDict()
+        dictionary = dict()
         for attr in save_attrs:
             try:
                 dictionary[attr] = getattr(self, attr)
@@ -437,7 +436,7 @@ class Grid(object):
         grid: bilby.core.grid.Grid
 
         Raises
-        =======
+        ======
         ValueError: If no filename is given and either outdir or label is None
                     If no bilby.core.grid.Grid is found in the path
 
