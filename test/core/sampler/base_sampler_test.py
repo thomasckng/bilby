@@ -2,6 +2,7 @@ import copy
 import os
 import unittest
 from unittest.mock import MagicMock
+from parameterized import parameterized
 
 import numpy as np
 
@@ -118,6 +119,32 @@ class TestSampler(unittest.TestCase):
 
     def test_bad_value_neg_inf_nan_to_num(self):
         self.sampler._check_bad_value(val=np.nan_to_num(-np.inf), warning=False, theta=None, label=None)
+
+
+samplers = ["dynesty", "ptemcee", "bilby_mcmc", "emcee"]
+
+
+class GenericSamplerTest(unittest.TestCase):
+    def setUp(self):
+        self.likelihood = bilby.core.likelihood.Likelihood(dict())
+        self.priors = bilby.core.prior.PriorDict(
+            dict(a=bilby.core.prior.Uniform(0, 1), b=bilby.core.prior.Uniform(0, 1))
+        )
+
+    @parameterized.expand(samplers)
+    def test_pool_creates_properly_no_pool(self, sampler):
+        sampler = bilby.core.sampler.IMPLEMENTED_SAMPLERS[sampler](self.likelihood, self.priors)
+        sampler._setup_pool()
+        self.assertIsNone(sampler.pool)
+
+    @parameterized.expand(samplers)
+    def test_pool_creates_properly_pool(self, sampler):
+        sampler = bilby.core.sampler.IMPLEMENTED_SAMPLERS[sampler](self.likelihood, self.priors, npool=2)
+        sampler._setup_pool()
+        if hasattr(sampler, "setup_sampler"):
+            sampler.setup_sampler()
+        self.assertEqual(sampler.pool._processes, 2)
+        sampler._close_pool()
 
 
 if __name__ == "__main__":

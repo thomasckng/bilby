@@ -123,7 +123,7 @@ class Dynesty(NestedSampler):
     default_kwargs = dict(
         bound="multi",
         sample="rwalk",
-        verbose=True,
+        print_progress=True,
         periodic=None,
         reflective=None,
         check_point_delta_t=1800,
@@ -178,7 +178,7 @@ class Dynesty(NestedSampler):
         exit_code=130,
         **kwargs,
     ):
-
+        self._translate_kwargs(kwargs)
         super(Dynesty, self).__init__(
             likelihood=likelihood,
             priors=priors,

@@ -135,7 +135,6 @@ class Bilby_MCMC(MCMCSampler):
         autocorr_c=5,
         L1steps=100,
         L2steps=3,
-        npool=1,
         printdt=60,
         min_tau=1,
         proposal_cycle="default",

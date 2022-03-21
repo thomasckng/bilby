@@ -188,7 +188,7 @@ class Sampler(object):
     """
 
     default_kwargs = dict()
-    npool_equiv_kwargs = ["queue_size", "threads", "nthreads", "npool", "cores"]
+    npool_equiv_kwargs = ["npool", "queue_size", "threads", "nthreads", "cores"]
     hard_exit = False
 
     def __init__(
