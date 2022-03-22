@@ -63,19 +63,27 @@ sampler_imports = dict(
 no_pool_test = ["dnest4", "pymultinest", "nestle", "ptmcmcsampler", "pypolychord", "ultranest"]
 
 
+def slow_func(x, m, c):
+    time.sleep(0.01)
+    return m * x + c
+
+
+def model(x, m, c):
+    return m * x + c
+
+
 class TestRunningSamplers(unittest.TestCase):
     def setUp(self):
         np.random.seed(42)
         bilby.core.utils.command_line_args.bilby_test_mode = False
         self.x = np.linspace(0, 1, 11)
-        self.model = lambda x, m, c: m * x + c
         self.injection_parameters = dict(m=0.5, c=0.2)
         self.sigma = 0.1
-        self.y = self.model(self.x, **self.injection_parameters) + np.random.normal(
+        self.y = model(self.x, **self.injection_parameters) + np.random.normal(
             0, self.sigma, len(self.x)
         )
         self.likelihood = bilby.likelihood.GaussianLikelihood(
-            self.x, self.y, self.model, self.sigma
+            self.x, self.y, model, self.sigma
         )
 
         self.priors = bilby.core.prior.PriorDict()
@@ -150,10 +158,6 @@ class TestRunningSamplers(unittest.TestCase):
         thread = threading.Thread(target=trigger_signal)
         thread.daemon = True
         thread.start()
-
-        def slow_func(x, m, c):
-            time.sleep(0.01)
-            return m * x + c
 
         self.likelihood._func = slow_func
 

@@ -408,7 +408,6 @@ class Emcee(MCMCSampler):
             self.write_chains_to_file(sample)
         if self.verbose:
             iterator.close()
-        self.checkpoint_info()
         self.write_current_state()
 
         self.result.sampler_output = np.nan
