@@ -129,14 +129,11 @@ class Nessai(NestedSampler):
             self.outdir, label=self.label, log_level=logger.getEffectiveLevel()
         )
         model = Model(self.search_parameter_keys, self.priors)
-        out = None
-        while out is None:
-            try:
-                out = FlowSampler(model, **self.kwargs)
-            except TypeError as e:
-                raise TypeError(f"Unable to initialise nessai sampler with error: {e}")
         try:
+            out = FlowSampler(model, **self.kwargs)
             out.run(save=True, plot=self.plot)
+        except TypeError as e:
+            raise TypeError(f"Unable to initialise nessai sampler with error: {e}")
         except SystemExit as e:
             import sys
 
