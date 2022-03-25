@@ -147,5 +147,24 @@ class GenericSamplerTest(unittest.TestCase):
         sampler._close_pool()
 
 
+class ReorderLikelihoodsTest(unittest.TestCase):
+
+    def setUp(self):
+        self.unsorted_ln_likelihoods = np.array([1, 5, 2, 5, 1])
+        self.unsorted_samples = np.array([[0, 1], [1, 1], [1, 0], [0, 0], [0, 1]])
+        self.sorted_samples = np.array([[0, 1], [0, 1], [1, 0], [1, 1], [0, 0]])
+        self.sorted_ln_likelihoods = np.array([1, 1, 2, 5, 5])
+
+    def tearDown(self):
+        pass
+
+    def test_ordering(self):
+        func = bilby.core.sampler.base_sampler.NestedSampler.reorder_loglikelihoods
+        sorted_ln_likelihoods = func(
+            self.unsorted_ln_likelihoods, self.unsorted_samples, self.sorted_samples
+        )
+        self.assertTrue(np.array_equal(sorted_ln_likelihoods, self.sorted_ln_likelihoods))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -754,8 +754,9 @@ class NestedSampler(Sampler):
     ]
     walks_equiv_kwargs = ["walks", "steps", "nmcmc"]
 
+    @staticmethod
     def reorder_loglikelihoods(
-        self, unsorted_loglikelihoods, unsorted_samples, sorted_samples
+        unsorted_loglikelihoods, unsorted_samples, sorted_samples
     ):
         """Reorders the stored log-likelihood after they have been reweighted
 
