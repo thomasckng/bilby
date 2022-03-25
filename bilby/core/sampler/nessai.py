@@ -172,6 +172,8 @@ class Nessai(NestedSampler):
             for equiv in self.npool_equiv_kwargs:
                 if equiv in kwargs:
                     kwargs["n_pool"] = kwargs.pop(equiv)
+            if "n_pool" not in kwargs:
+                kwargs["n_pool"] = self._npool
         if "seed" not in kwargs:
             for equiv in self.seed_equiv_kwargs:
                 if equiv in kwargs:

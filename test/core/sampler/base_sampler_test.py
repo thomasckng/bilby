@@ -121,7 +121,7 @@ class TestSampler(unittest.TestCase):
         self.sampler._check_bad_value(val=np.nan_to_num(-np.inf), warning=False, theta=None, label=None)
 
 
-samplers = ["dynesty", "ptemcee", "bilby_mcmc", "emcee"]
+samplers = ["dynesty", "ptemcee", "bilby_mcmc", "emcee", "nessai"]
 
 
 class GenericSamplerTest(unittest.TestCase):

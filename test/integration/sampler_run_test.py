@@ -39,7 +39,12 @@ _sampler_kwargs = dict(
     ),
     emcee=dict(iterations=1000, nwalkers=10),
     kombine=dict(iterations=2000, nwalkers=20, autoburnin=False),
-    nessai=dict(nlive=100, poolsize=1000, max_iteration=1000),
+    nessai=dict(
+        nlive=100,
+        poolsize=1000,
+        max_iteration=1000,
+        max_threads=3,
+    ),
     nestle=dict(nlive=100),
     ptemcee=dict(
         nsamples=100,
@@ -147,6 +152,11 @@ class TestRunningSamplers(unittest.TestCase):
             pytest.skip(f"{sampler} cannot be parallelized")
         if sys.version_info.minor == 8 and sampler.lower == "cpnest":
             pytest.skip("Pool interrupting broken for cpnest with py3.8")
+        if sampler.lower == "nessai" and pool_size > 1:
+            pytest.skip(
+                "Interrupting pool is failing in pytest. "
+                "Likely due to interactions with the signal handling in nessai."
+            )
         pid = os.getpid()
         print(sampler)
 
