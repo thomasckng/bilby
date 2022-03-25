@@ -518,6 +518,7 @@ class BilbyPTMCMCSampler(object):
     ):
         from ..core.sampler.base_sampler import _sampling_convenience_dump
 
+        self._sampling_helper = _sampling_convenience_dump
         self.set_pt_inputs(pt_inputs)
         self.use_ratio = use_ratio
         self.setup_sampler_dictionary(convergence_inputs, proposal_cycle)
@@ -534,7 +535,6 @@ class BilbyPTMCMCSampler(object):
         self.swap_counter["L2-ensemble"] = int(self.L2steps / 2) + 1
 
         self._nsamples_dict = {}
-        self._sampling_helper = _sampling_convenience_dump
         self.ensemble_proposal_cycle = proposals.get_default_ensemble_proposal_cycle(
             self._sampling_helper.priors
         )
