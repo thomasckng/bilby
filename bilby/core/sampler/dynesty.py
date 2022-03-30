@@ -414,10 +414,12 @@ class Dynesty(NestedSampler):
                 **self.sampler_init_kwargs,
             )
 
+        self.start_time = datetime.datetime.now()
         if self.check_point:
             out = self._run_external_sampler_with_checkpointing()
         else:
             out = self._run_external_sampler_without_checkpointing()
+        self._update_sampling_time()
 
         self._close_pool()
 
@@ -473,6 +475,11 @@ class Dynesty(NestedSampler):
             ncores=self.kwargs.get("queue_size", 1),
         )
 
+    def _update_sampling_time(self):
+        end_time = datetime.datetime.now()
+        self.sampling_time += end_time - self.start_time
+        self.start_time = end_time
+
     def _run_nested_wrapper(self, kwargs):
         """Wrapper function to run_nested
 
@@ -504,7 +511,6 @@ class Dynesty(NestedSampler):
         sampler_kwargs = self.sampler_function_kwargs.copy()
         sampler_kwargs["maxcall"] = self.n_check_point
         sampler_kwargs["add_live"] = True
-        self.start_time = datetime.datetime.now()
         while True:
             self._run_nested_wrapper(sampler_kwargs)
             if self.sampler.ncall == old_ncall:
@@ -627,10 +633,8 @@ class Dynesty(NestedSampler):
             return
 
         check_directory_exists_and_if_not_mkdir(self.outdir)
-        end_time = datetime.datetime.now()
         if hasattr(self, "start_time"):
-            self.sampling_time += end_time - self.start_time
-            self.start_time = end_time
+            self._update_sampling_time()
             self.sampler.kwargs["sampling_time"] = self.sampling_time
             self.sampler.kwargs["start_time"] = self.start_time
         self.sampler.versions = dict(bilby=bilby_version, dynesty=dynesty_version)
