@@ -1159,9 +1159,14 @@ def compute_snrs(sample, likelihood, npool=1):
             from tqdm.auto import tqdm
             logger.info('Computing SNRs for every sample.')
 
-            fill_args = [(ii, row, likelihood) for ii, row in sample.iterrows()]
+            fill_args = [(ii, row) for ii, row in sample.iterrows()]
             if npool > 1:
-                pool = multiprocessing.Pool(processes=npool)
+                from ..core.sampler.base_sampler import _initialize_global_variables
+                pool = multiprocessing.Pool(
+                    processes=npool,
+                    initializer=_initialize_global_variables,
+                    initargs=(likelihood, None, None, False),
+                )
                 logger.info(
                     "Using a pool with size {} for nsamples={}".format(npool, len(sample))
                 )
@@ -1169,6 +1174,8 @@ def compute_snrs(sample, likelihood, npool=1):
                 pool.close()
                 pool.join()
             else:
+                from ..core.sampler.base_sampler import _sampling_convenience_dump
+                _sampling_convenience_dump.likelihood = likelihood
                 new_samples = [_compute_snrs(xx) for xx in tqdm(fill_args, file=sys.stdout)]
 
             for ii, ifo in enumerate(likelihood.interferometers):
@@ -1189,7 +1196,9 @@ def compute_snrs(sample, likelihood, npool=1):
 
 def _compute_snrs(args):
     """A wrapper of computing the SNRs to enable multiprocessing"""
-    ii, sample, likelihood = args
+    from ..core.sampler.base_sampler import _sampling_convenience_dump
+    likelihood = _sampling_convenience_dump.likelihood
+    ii, sample = args
     sample = dict(sample).copy()
     signal_polarizations = likelihood.waveform_generator.frequency_domain_strain(
         sample
@@ -1274,15 +1283,22 @@ def generate_posterior_samples_from_marginalized_likelihood(
 
     # Set up the multiprocessing
     if npool > 1:
-        pool = multiprocessing.Pool(processes=npool)
+        from ..core.sampler.base_sampler import _initialize_global_variables
+        pool = multiprocessing.Pool(
+            processes=npool,
+            initializer=_initialize_global_variables,
+            initargs=(likelihood, None, None, False),
+        )
         logger.info(
             "Using a pool with size {} for nsamples={}"
             .format(npool, len(samples))
         )
     else:
+        from ..core.sampler.base_sampler import _sampling_convenience_dump
+        _sampling_convenience_dump.likelihood = likelihood
         pool = None
 
-    fill_args = [(ii, row, likelihood) for ii, row in samples.iterrows()]
+    fill_args = [(ii, row) for ii, row in samples.iterrows()]
     ii = 0
     pbar = tqdm(total=len(samples), file=sys.stdout)
     while ii < len(samples):
@@ -1344,7 +1360,9 @@ def generate_sky_frame_parameters(samples, likelihood):
 
 
 def fill_sample(args):
-    ii, sample, likelihood = args
+    from ..core.sampler.base_sampler import _sampling_convenience_dump
+    likelihood = _sampling_convenience_dump.likelihood
+    ii, sample = args
     sample = dict(sample).copy()
     likelihood.parameters.update(dict(sample).copy())
     new_sample = likelihood.generate_posterior_sample_from_marginalized_likelihood()
@@ -1355,3 +1373,4 @@ def fill_sample(args):
     else:
         return new_sample["geocent_time"], new_sample["luminosity_distance"],\
             new_sample["phase"], new_sample['recalib_index']
+
