@@ -1373,4 +1373,3 @@ def fill_sample(args):
     else:
         return new_sample["geocent_time"], new_sample["luminosity_distance"],\
             new_sample["phase"], new_sample['recalib_index']
-
