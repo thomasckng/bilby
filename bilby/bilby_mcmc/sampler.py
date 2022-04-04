@@ -113,6 +113,8 @@ class Bilby_MCMC(MCMCSampler):
         Method to draw the initial sample. Either "prior" (a random draw
         from the prior) or "maxL" (use an optimization approach to attempt to
         find the maxL).
+    verbose: bool
+        Whether to print diagnostic output during the run.
 
     """
 
@@ -159,6 +161,7 @@ class Bilby_MCMC(MCMCSampler):
         diagnostic=False,
         resume=True,
         exit_code=130,
+        verbose=False,
         **kwargs,
     ):
 
@@ -196,6 +199,7 @@ class Bilby_MCMC(MCMCSampler):
         self.resume_file = "{}/{}_resume.pickle".format(self.outdir, self.label)
 
         self.verify_configuration()
+        self.verbose = verbose
 
         try:
             signal.signal(signal.SIGTERM, self.write_current_state_and_exit)
@@ -498,7 +502,8 @@ class Bilby_MCMC(MCMCSampler):
             rse = 100 * count / nsamples
             msg += f"|rse={rse:0.2f}%"
 
-        print(msg, flush=True)
+        if self.verbose:
+            print(msg, flush=True)
 
     def print_per_proposal(self):
         logger.info("Zero-temperature proposals:")
@@ -623,7 +628,7 @@ class BilbyPTMCMCSampler(object):
         elif pt_inputs.Tmax_from_SNR is not None:
             ndim = len(_priors.non_fixed_keys)
             target_hot_likelihood = ndim / 2
-            Tmax = pt_inputs.Tmax_from_SNR ** 2 / (2 * target_hot_likelihood)
+            Tmax = pt_inputs.Tmax_from_SNR**2 / (2 * target_hot_likelihood)
             betas = np.logspace(0, -np.log10(Tmax), pt_inputs.ntemps)
         else:
             raise SamplerError("Unable to set temperature ladder from inputs")
@@ -1161,7 +1166,9 @@ class BilbyMCMCSampler(object):
                 k: v for k, v in full_sample_dict.items() if k in _priors.non_fixed_keys
             }
         elif initial_sample.lower() == "maxl":
-            fmp = FisherMatrixPosteriorEstimator(_likelihood, _priors, n_prior_samples=1)
+            fmp = FisherMatrixPosteriorEstimator(
+                _likelihood, _priors, n_prior_samples=1
+            )
             initial_sample = fmp.get_maximimum_likelihood_sample()
         else:
             ValueError(f"initial sample {initial_sample} not understood")

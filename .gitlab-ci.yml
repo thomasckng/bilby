@@ -211,17 +211,16 @@ plotting-python-3.9:
 docs:
   stage: docs
   image: containers.ligo.org/lscsoft/bilby/v2-bilby-python39
+  before_script:
+    - conda install -c conda-forge pandoc -y
+    - python -m pip install --upgrade ipykernel ipython jupyter nbconvert
+    - python -m ipykernel install
   script:
     # Make the documentation
-    - apt-get -yqq install pandoc
     - python -m pip install .
-    - cd docs
-    - pip install ipykernel ipython jupyter
-    - cp ../examples/tutorials/*.ipynb ./
-    - rm basic_ptmcmc_tutorial.ipynb
-    - rm compare_samplers.ipynb
-    - rm visualising_the_results.ipynb
-    - jupyter nbconvert --to notebook --execute *.ipynb --inplace
+    - cd examples/tutorials
+    - jupyter nbconvert --to notebook --execute *.ipynb --output-dir ../../docs
+    - cd ../../docs
     - make clean
     - make html
 
@@ -231,7 +230,7 @@ docs:
 
 # ------------------- Deploy stage -------------------------------------------
 
-deploy-docs:
+pages:
   stage: deploy
   needs: ["docs", "python-3.9"]
   script:

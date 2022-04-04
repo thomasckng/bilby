@@ -85,7 +85,7 @@ class Polynomial(bilby.Likelihood):
         res = self.y - self.polynomial(self.x, self.parameters)
         return -0.5 * (
             np.sum((res / self.sigma) ** 2)
-            + self.N * np.log(2 * np.pi * self.sigma ** 2)
+            + self.N * np.log(2 * np.pi * self.sigma**2)
         )
 
 
@@ -99,7 +99,7 @@ def fit(n):
     result = bilby.run_sampler(
         likelihood=likelihood,
         priors=priors,
-        nlive=1000,
+        nlive=100,
         outdir=outdir,
         label=label,
         sampler="nestle",

@@ -517,10 +517,8 @@ def chirp_mass_and_mass_ratio_to_total_mass(chirp_mass, mass_ratio):
 
     Returns
     =======
-    mass_1: float
-        Mass of the heavier object
-    mass_2: float
-        Mass of the lighter object
+    total_mass: float
+        Total mass of the binary
     """
 
     with np.errstate(invalid="ignore"):
@@ -1167,6 +1165,7 @@ def compute_snrs(sample, likelihood, npool=1):
                 )
                 new_samples = pool.map(_compute_snrs, tqdm(fill_args, file=sys.stdout))
                 pool.close()
+                pool.join()
             else:
                 new_samples = [_compute_snrs(xx) for xx in tqdm(fill_args, file=sys.stdout)]
 
@@ -1307,6 +1306,7 @@ def generate_posterior_samples_from_marginalized_likelihood(
 
     if pool is not None:
         pool.close()
+        pool.join()
 
     new_samples = np.concatenate(
         [np.array(val) for key, val in cached_samples_dict.items() if key != "_samples"]
