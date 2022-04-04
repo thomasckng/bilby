@@ -91,6 +91,7 @@ class Sampler(object):
     """
     default_kwargs = dict()
     npool_equiv_kwargs = ['queue_size', 'threads', 'nthreads', 'npool']
+    check_point_equiv_kwargs = ['check_point_deltaT', 'check_point_delta_t']
 
     def __init__(
             self, likelihood, priors, outdir='outdir', label='label',

@@ -3,10 +3,10 @@ import time
 from abc import ABCMeta, abstractmethod
 
 import numpy as np
-import scipy.linalg
 from scipy.spatial.distance import jensenshannon
 from scipy.stats import gaussian_kde
 
+from ..core.fisher import FisherMatrixPosteriorEstimator
 from ..core.prior import PriorDict
 from ..core.sampler.base_sampler import SamplerError
 from ..core.utils import logger, reflect
@@ -778,104 +778,27 @@ class FisherMatrixProposal(AdaptiveGaussianProposal):
         priors,
         subset=None,
         weight=1,
-        log_likelihood=None,
+        likelihood=None,
         update_interval=100,
         scale_init=1e0,
         fd_eps=1e-4,
+        adapt=False,
     ):
         super(FisherMatrixProposal, self).__init__(
             priors, weight, subset, scale_init=scale_init
         )
-        self.log_likelihood = log_likelihood
-        self.mean = np.zeros(len(self.parameters))
+        self.fmp = FisherMatrixPosteriorEstimator(likelihood, priors, fd_eps=fd_eps)
         self.update_interval = update_interval
+        self.mean = np.zeros(self.fmp.N)
         self.steps_since_update = update_interval
-        self.fd_eps = fd_eps
-
-    def calculate_iFIM(self, sample):
-        FIM = self.calculate_FIM(sample)
-        iFIM = scipy.linalg.inv(FIM)
-
-        # Ensure iFIM is positive definite
-        min_eig = np.min(np.real(np.linalg.eigvals(iFIM)))
-        if min_eig < 0:
-            iFIM -= 10 * min_eig * np.eye(*iFIM.shape)
-
-        return iFIM
-
-    def calculate_FIM(self, sample):
-        N = len(self.parameters)
-        FIM = np.zeros((N, N))
-        for ii, ii_key in enumerate(self.parameters):
-            for jj, jj_key in enumerate(self.parameters):
-                FIM[ii, jj] = -self.get_second_order_derivative(sample, ii_key, jj_key)
-
-        return FIM
-
-    def get_second_order_derivative(self, sample, ii, jj):
-        if ii == jj:
-            return self.get_finite_difference_xx(sample, ii)
-        else:
-            return self.get_finite_difference_xy(sample, ii, jj)
-
-    def get_finite_difference_xx(self, sample, ii):
-        # Sample grid
-        p = self.shift_sample_x(sample, ii, 1)
-        m = self.shift_sample_x(sample, ii, -1)
-
-        dx = p[ii] - m[ii]
-
-        loglp = self.log_likelihood(p)
-        logl = self.log_likelihood(sample)
-        loglm = self.log_likelihood(m)
-
-        return (loglp - 2 * logl + loglm) / dx ** 2
-
-    def get_finite_difference_xy(self, sample, ii, jj):
-        # Sample grid
-        pp = self.shift_sample_xy(sample, ii, 1, jj, 1)
-        pm = self.shift_sample_xy(sample, ii, 1, jj, -1)
-        mp = self.shift_sample_xy(sample, ii, -1, jj, 1)
-        mm = self.shift_sample_xy(sample, ii, -1, jj, -1)
-
-        dx = pp[ii] - mm[ii]
-        dy = pp[jj] - mm[jj]
-
-        loglpp = self.log_likelihood(pp)
-        loglpm = self.log_likelihood(pm)
-        loglmp = self.log_likelihood(mp)
-        loglmm = self.log_likelihood(mm)
-
-        return (loglpp - loglpm - loglmp + loglmm) / (4 * dx * dy)
-
-    def shift_sample_x(self, sample, x_key, x_coef):
-
-        vx = sample[x_key]
-        dvx = self.fd_eps * self.prior_width_dict[x_key]
-
-        shift_sample = sample.copy()
-        shift_sample[x_key] = vx + x_coef * dvx
-
-        return shift_sample
-
-    def shift_sample_xy(self, sample, x_key, x_coef, y_key, y_coef):
-
-        vx = sample[x_key]
-        vy = sample[y_key]
-
-        dvx = self.fd_eps * self.prior_width_dict[x_key]
-        dvy = self.fd_eps * self.prior_width_dict[y_key]
-
-        shift_sample = sample.copy()
-        shift_sample[x_key] = vx + x_coef * dvx
-        shift_sample[y_key] = vy + y_coef * dvy
-        return shift_sample
+        self.adapt = adapt
 
     def propose(self, chain):
         sample = chain.current_sample
-        self.update_scale(chain)
+        if self.adapt:
+            self.update_scale(chain)
         if self.steps_since_update >= self.update_interval:
-            self.iFIM = self.calculate_iFIM(sample)
+            self.iFIM = self.fmp.calculate_iFIM(sample.dict)
             self.steps_since_update = 0
 
         jump = self.scale * np.random.multivariate_normal(self.mean, self.iFIM)
@@ -1097,7 +1020,7 @@ def get_default_ensemble_proposal_cycle(priors):
     return ProposalCycle([EnsembleStretch(priors)])
 
 
-def get_proposal_cycle(string, priors, L1steps=1, warn=True, log_likelihood=None):
+def get_proposal_cycle(string, priors, L1steps=1, warn=True, likelihood=None):
     big_weight = 10
     small_weight = 5
     tiny_weight = 0.1
@@ -1124,21 +1047,15 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True, log_likelihood=None
         if priors.intrinsic:
             intrinsic = PARAMETER_SETS["intrinsic"]
             plist += [
-                AdaptiveGaussianProposal(priors, weight=big_weight, subset=intrinsic),
+                AdaptiveGaussianProposal(priors, weight=small_weight, subset=intrinsic),
                 DifferentialEvolutionProposal(
-                    priors, weight=big_weight, subset=intrinsic
+                    priors, weight=small_weight, subset=intrinsic
                 ),
                 KDEProposal(
-                    priors, weight=big_weight, subset=intrinsic, **learning_kwargs
+                    priors, weight=small_weight, subset=intrinsic, **learning_kwargs
                 ),
                 GMMProposal(
-                    priors, weight=big_weight, subset=intrinsic, **learning_kwargs
-                ),
-                FisherMatrixProposal(
-                    priors,
-                    weight=big_weight,
-                    subset=intrinsic,
-                    log_likelihood=log_likelihood,
+                    priors, weight=small_weight, subset=intrinsic, **learning_kwargs
                 ),
             ]
 
@@ -1147,19 +1064,13 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True, log_likelihood=None
             plist += [
                 AdaptiveGaussianProposal(priors, weight=small_weight, subset=extrinsic),
                 DifferentialEvolutionProposal(
-                    priors, weight=big_weight, subset=extrinsic
+                    priors, weight=small_weight, subset=extrinsic
                 ),
                 KDEProposal(
-                    priors, weight=big_weight, subset=extrinsic, **learning_kwargs
+                    priors, weight=small_weight, subset=extrinsic, **learning_kwargs
                 ),
                 GMMProposal(
-                    priors, weight=big_weight, subset=extrinsic, **learning_kwargs
-                ),
-                FisherMatrixProposal(
-                    priors,
-                    weight=big_weight,
-                    subset=extrinsic,
-                    log_likelihood=log_likelihood,
+                    priors, weight=small_weight, subset=extrinsic, **learning_kwargs
                 ),
             ]
 
@@ -1174,7 +1085,7 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True, log_likelihood=None
                     priors,
                     weight=big_weight,
                     subset=mass,
-                    log_likelihood=log_likelihood,
+                    likelihood=likelihood,
                 ),
             ]
 
@@ -1185,12 +1096,24 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True, log_likelihood=None
                 GMMProposal(
                     priors, weight=small_weight, subset=spin, **learning_kwargs
                 ),
+                FisherMatrixProposal(
+                    priors,
+                    weight=big_weight,
+                    subset=spin,
+                    likelihood=likelihood,
+                ),
             ]
         if priors.precession:
             measured_spin = ["chi_1", "chi_2", "a_1", "a_2", "chi_1_in_plane"]
             plist += [
                 AdaptiveGaussianProposal(
                     priors, weight=small_weight, subset=measured_spin
+                ),
+                FisherMatrixProposal(
+                    priors,
+                    weight=small_weight,
+                    subset=measured_spin,
+                    likelihood=likelihood,
                 ),
             ]
 
@@ -1219,6 +1142,26 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True, log_likelihood=None
                 CorrelatedPolarisationPhaseJump(priors, weight=tiny_weight),
                 PhasePolarisationReversalProposal(priors, weight=tiny_weight),
             ]
+        if priors.sky:
+            sky = PARAMETER_SETS["sky"]
+            plist += [
+                FisherMatrixProposal(
+                    priors,
+                    weight=small_weight,
+                    subset=sky,
+                    likelihood=likelihood,
+                ),
+            ]
+        if priors.distance_inclination:
+            distance_inclination = PARAMETER_SETS["distance_inclination"]
+            plist += [
+                FisherMatrixProposal(
+                    priors,
+                    weight=small_weight,
+                    subset=distance_inclination,
+                    likelihood=likelihood,
+                ),
+            ]
         for key in ["time_jitter", "psi", "phi_12", "tilt_2", "lambda_1", "lambda_2"]:
             if key in priors.non_fixed_keys:
                 plist.append(PriorProposal(priors, subset=[key], weight=tiny_weight))
@@ -1241,11 +1184,9 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True, log_likelihood=None
             plist.append(
                 NormalizingFlowProposal(priors, weight=big_weight, scale_fits=L1steps)
             )
-        if log_likelihood is not None:
+        if likelihood is not None:
             plist.append(
-                FisherMatrixProposal(
-                    priors, weight=big_weight, log_likelihood=log_likelihood
-                )
+                FisherMatrixProposal(priors, weight=big_weight, likelihood=likelihood)
             )
 
     plist = remove_proposals_using_string(plist, string)
