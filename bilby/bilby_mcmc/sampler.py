@@ -1161,7 +1161,7 @@ class BilbyMCMCSampler(object):
                 k: v for k, v in full_sample_dict.items() if k in _priors.non_fixed_keys
             }
         elif initial_sample.lower() == "maxl":
-            fmp = FisherMatrixPosteriorEstimator(_likelihood, _priors)
+            fmp = FisherMatrixPosteriorEstimator(_likelihood, _priors, n_prior_samples=1)
             initial_sample = fmp.get_maximimum_likelihood_sample()
         else:
             ValueError(f"initial sample {initial_sample} not understood")

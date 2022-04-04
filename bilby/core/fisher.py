@@ -6,7 +6,7 @@ from scipy.optimize import minimize
 
 
 class FisherMatrixPosteriorEstimator(object):
-    def __init__(self, likelihood, priors, fd_eps=1e-6, n_prior_samples=100):
+    def __init__(self, likelihood, priors, parameters=None, fd_eps=1e-6, n_prior_samples=100):
         """ A class to estimate posteriors using the Fisher Matrix approach
 
         Parameters
@@ -15,6 +15,8 @@ class FisherMatrixPosteriorEstimator(object):
             A bilby likelihood object
         priors: bilby.core.prior.PriorDict
             A bilby prior object
+        parameters: list
+            Names of parameters to sample in
         fd_eps: float
             A parameter to control the size of perturbation used when finite
             differencing the likelihood
@@ -23,7 +25,10 @@ class FisherMatrixPosteriorEstimator(object):
             of the maximum likelihood sample.
         """
         self.likelihood = likelihood
-        self.parameter_names = priors.non_fixed_keys
+        if parameters is None:
+            self.parameter_names = priors.non_fixed_keys
+        else:
+            self.parameter_names = parameters
         self.fd_eps = fd_eps
         self.n_prior_samples = n_prior_samples
         self.N = len(self.parameter_names)
