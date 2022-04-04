@@ -787,7 +787,7 @@ class FisherMatrixProposal(AdaptiveGaussianProposal):
         super(FisherMatrixProposal, self).__init__(
             priors, weight, subset, scale_init=scale_init
         )
-        self.fmp = FisherMatrixPosteriorEstimator(likelihood, priors, fd_eps=fd_eps)
+        self.fmp = FisherMatrixPosteriorEstimator(likelihood, priors, parameters=self.parameters, fd_eps=fd_eps)
         self.update_interval = update_interval
         self.mean = np.zeros(self.fmp.N)
         self.steps_since_update = update_interval
