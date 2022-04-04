@@ -675,6 +675,16 @@ class CBCPriorDict(ConditionalPriorDict):
         return self.is_nonempty_intersection("extrinsic")
 
     @property
+    def sky(self):
+        """ Return true if priors include any extrinsic parameters """
+        return self.is_nonempty_intersection("sky")
+
+    @property
+    def distance_inclination(self):
+        """ Return true if priors include any extrinsic parameters """
+        return self.is_nonempty_intersection("distance_inclination")
+
+    @property
     def mass(self):
         """ Return true if priors include any mass parameters """
         return self.is_nonempty_intersection("mass")

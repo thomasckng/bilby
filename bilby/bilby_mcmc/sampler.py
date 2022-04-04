@@ -7,6 +7,7 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
+from ..core.fisher import FisherMatrixPosteriorEstimator
 from ..core.result import rejection_sample
 from ..core.sampler.base_sampler import MCMCSampler, ResumeError, SamplerError
 from ..core.utils import check_directory_exists_and_if_not_mkdir, logger, safe_file_dump
@@ -108,6 +109,10 @@ class Bilby_MCMC(MCMCSampler):
     evidence_method: str, [stepping_stone, thermodynamic]
         The evidence calculation method to use. Defaults to stepping_stone, but
         the results of all available methods are stored in the ln_z_dict.
+    initial_sample: str
+        Method to draw the initial sample. Either "prior" (a random draw
+        from the prior) or "maxL" (use an optimization approach to attempt to
+        find the maxL).
 
     """
 
@@ -137,6 +142,8 @@ class Bilby_MCMC(MCMCSampler):
         fixed_tau=None,
         tau_window=None,
         evidence_method="stepping_stone",
+        check_point_delta_t=1800,
+        initial_sample="maxL",
     )
 
     def __init__(
@@ -181,11 +188,11 @@ class Bilby_MCMC(MCMCSampler):
         self.proposal_cycle = self.kwargs["proposal_cycle"]
         self.pt_rejection_sample = self.kwargs["pt_rejection_sample"]
         self.evidence_method = self.kwargs["evidence_method"]
+        self.initial_sample = self.kwargs["initial_sample"]
 
         self.printdt = self.kwargs["printdt"]
         check_directory_exists_and_if_not_mkdir(self.outdir)
         self.resume = resume
-        self.check_point_delta_t = check_point_delta_t
         self.resume_file = "{}/{}_resume.pickle".format(self.outdir, self.label)
 
         self.verify_configuration()
@@ -214,6 +221,10 @@ class Bilby_MCMC(MCMCSampler):
             for equiv in self.npool_equiv_kwargs:
                 if equiv in kwargs:
                     kwargs["npool"] = kwargs.pop(equiv)
+        if "check_point_delta_t" not in kwargs:
+            for equiv in self.check_point_equiv_kwargs:
+                if equiv in kwargs:
+                    kwargs["check_point_delta_t"] = kwargs.pop(equiv)
 
     @property
     def target_nsamples(self):
@@ -288,6 +299,7 @@ class Bilby_MCMC(MCMCSampler):
             pool=self.pool,
             use_ratio=self.use_ratio,
             evidence_method=self.evidence_method,
+            initial_sample=self.initial_sample,
         )
 
     def get_setup_string(self):
@@ -303,7 +315,7 @@ class Bilby_MCMC(MCMCSampler):
         self._steps_since_last_print = 0
         self._time_since_last_print = 0
         logger.info(f"Drawing {self.target_nsamples} samples")
-        logger.info(f"Checkpoint every {self.check_point_delta_t}s")
+        logger.info(f"Checkpoint every {self.kwargs['check_point_delta_t']}s")
         logger.info(f"Print update every {self.printdt}s")
 
         while True:
@@ -341,7 +353,7 @@ class Bilby_MCMC(MCMCSampler):
         else:
             tR = np.inf
 
-        if ignore_time or np.min([tS, tR]) > self.check_point_delta_t:
+        if ignore_time or np.min([tS, tR]) > self.kwargs["check_point_delta_t"]:
             logger.info("Checkpoint start")
             self.write_current_state()
             self.print_long_progress()
@@ -573,10 +585,12 @@ class BilbyPTMCMCSampler(object):
         pool,
         use_ratio,
         evidence_method,
+        initial_sample,
     ):
 
         self.set_pt_inputs(pt_inputs)
         self.use_ratio = use_ratio
+        self.initial_sample = initial_sample
         self.setup_sampler_dictionary(convergence_inputs, proposal_cycle)
         self.set_convergence_inputs(convergence_inputs)
         self.pt_rejection_sample = pt_rejection_sample
@@ -624,10 +638,11 @@ class BilbyPTMCMCSampler(object):
         betas = self.get_initial_betas()
         logger.info(
             f"Initializing BilbyPTMCMCSampler with:"
-            f"ntemps={self.ntemps},"
-            f"nensemble={self.nensemble},"
-            f"pt_ensemble={self.pt_ensemble},"
-            f"initial_betas={betas}\n"
+            f"ntemps={self.ntemps}, "
+            f"nensemble={self.nensemble}, "
+            f"pt_ensemble={self.pt_ensemble}, "
+            f"initial_betas={betas}, "
+            f"initial_sample={self.initial_sample}\n"
         )
         self.sampler_dictionary = dict()
         for Tindex, beta in enumerate(betas):
@@ -643,6 +658,7 @@ class BilbyPTMCMCSampler(object):
                     convergence_inputs=convergence_inputs,
                     proposal_cycle=proposal_cycle,
                     use_ratio=self.use_ratio,
+                    initial_sample=self.initial_sample,
                 )
                 for Eindex in range(n)
             ]
@@ -1129,6 +1145,7 @@ class BilbyMCMCSampler(object):
         Tindex=0,
         Eindex=0,
         use_ratio=False,
+        initial_sample="maxL",
     ):
         self.beta = beta
         self.Tindex = Tindex
@@ -1138,10 +1155,17 @@ class BilbyMCMCSampler(object):
         self.parameters = _priors.non_fixed_keys
         self.ndim = len(self.parameters)
 
-        full_sample_dict = _priors.sample()
-        initial_sample = {
-            k: v for k, v in full_sample_dict.items() if k in _priors.non_fixed_keys
-        }
+        if initial_sample.lower() == "prior":
+            full_sample_dict = _priors.sample()
+            initial_sample = {
+                k: v for k, v in full_sample_dict.items() if k in _priors.non_fixed_keys
+            }
+        elif initial_sample.lower() == "maxl":
+            fmp = FisherMatrixPosteriorEstimator(_likelihood, _priors)
+            initial_sample = fmp.get_maximimum_likelihood_sample()
+        else:
+            ValueError(f"initial sample {initial_sample} not understood")
+
         initial_sample = Sample(initial_sample)
         initial_sample[LOGLKEY] = self.log_likelihood(initial_sample)
         initial_sample[LOGPKEY] = self.log_prior(initial_sample)
@@ -1167,7 +1191,7 @@ class BilbyMCMCSampler(object):
                 _priors,
                 L1steps=self.chain.L1steps,
                 warn=warn,
-                log_likelihood=self.log_likelihood,
+                likelihood=_likelihood,
             )
         elif isinstance(proposal_cycle, proposals.ProposalCycle):
             self.proposal_cycle = proposal_cycle
