@@ -62,6 +62,9 @@ class BaseProposal(object):
             self.parameters = [p for p in self.parameters if p in subset]
             self._str_attrs.append("parameters")
 
+        if len(self.parameters) == 0:
+            raise ValueError("Proposal requested with zero parameters")
+
         self.ndim = len(self.parameters)
 
         self.prior_boundary_dict = {key: priors[key].boundary for key in priors}
@@ -130,8 +133,11 @@ class BaseProposal(object):
         val_normalised_reflected = reflect(np.array(val_normalised))
         return minimum + width * val_normalised_reflected
 
-    def __call__(self, chain):
-        sample, log_factor = self.propose(chain)
+    def __call__(self, chain, likelihood=None, priors=None):
+        if getattr(self, "needs_likelihood_and_priors", False):
+            sample, log_factor = self.propose(chain, likelihood, priors)
+        else:
+            sample, log_factor = self.propose(chain)
         sample = self.apply_boundaries(sample)
         return sample, log_factor
 
@@ -765,6 +771,7 @@ class FixedJumpProposal(BaseProposal):
 
 
 class FisherMatrixProposal(AdaptiveGaussianProposal):
+    needs_likelihood_and_priors = True
     """Fisher Matrix Proposals
 
     Uses a finite differencing approach motivated by BayesWave (see, e.g.
@@ -778,7 +785,6 @@ class FisherMatrixProposal(AdaptiveGaussianProposal):
         priors,
         subset=None,
         weight=1,
-        likelihood=None,
         update_interval=100,
         scale_init=1e0,
         fd_eps=1e-4,
@@ -787,19 +793,22 @@ class FisherMatrixProposal(AdaptiveGaussianProposal):
         super(FisherMatrixProposal, self).__init__(
             priors, weight, subset, scale_init=scale_init
         )
-        self.fmp = FisherMatrixPosteriorEstimator(likelihood, priors, parameters=self.parameters, fd_eps=fd_eps)
         self.update_interval = update_interval
-        self.mean = np.zeros(self.fmp.N)
         self.steps_since_update = update_interval
         self.adapt = adapt
+        self.mean = np.zeros(len(self.parameters))
+        self.fd_eps = fd_eps
 
-    def propose(self, chain):
+    def propose(self, chain, likelihood, priors):
         sample = chain.current_sample
         if self.adapt:
             self.update_scale(chain)
         if self.steps_since_update >= self.update_interval:
+            fmp = FisherMatrixPosteriorEstimator(
+                likelihood, priors, parameters=self.parameters, fd_eps=self.fd_eps
+            )
             try:
-                self.iFIM = self.fmp.calculate_iFIM(sample.dict)
+                self.iFIM = fmp.calculate_iFIM(sample.dict)
             except RuntimeError:
                 pass
             self.steps_since_update = 0
@@ -1023,10 +1032,10 @@ def get_default_ensemble_proposal_cycle(priors):
     return ProposalCycle([EnsembleStretch(priors)])
 
 
-def get_proposal_cycle(string, priors, L1steps=1, warn=True, likelihood=None):
+def get_proposal_cycle(string, priors, L1steps=1, warn=True):
     big_weight = 10
     small_weight = 5
-    tiny_weight = 0.1
+    tiny_weight = 0.5
 
     if "gwA" in string:
         # Parameters for learning proposals
@@ -1088,7 +1097,6 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True, likelihood=None):
                     priors,
                     weight=big_weight,
                     subset=mass,
-                    likelihood=likelihood,
                 ),
             ]
 
@@ -1103,11 +1111,10 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True, likelihood=None):
                     priors,
                     weight=big_weight,
                     subset=spin,
-                    likelihood=likelihood,
                 ),
             ]
-        if priors.precession:
-            measured_spin = ["chi_1", "chi_2", "a_1", "a_2", "chi_1_in_plane"]
+        if priors.measured_spin:
+            measured_spin = PARAMETER_SETS["measured_spin"]
             plist += [
                 AdaptiveGaussianProposal(
                     priors, weight=small_weight, subset=measured_spin
@@ -1116,7 +1123,6 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True, likelihood=None):
                     priors,
                     weight=small_weight,
                     subset=measured_spin,
-                    likelihood=likelihood,
                 ),
             ]
 
@@ -1152,7 +1158,6 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True, likelihood=None):
                     priors,
                     weight=small_weight,
                     subset=sky,
-                    likelihood=likelihood,
                 ),
             ]
         if priors.distance_inclination:
@@ -1162,7 +1167,6 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True, likelihood=None):
                     priors,
                     weight=small_weight,
                     subset=distance_inclination,
-                    likelihood=likelihood,
                 ),
             ]
         for key in ["time_jitter", "psi", "phi_12", "tilt_2", "lambda_1", "lambda_2"]:
@@ -1187,10 +1191,7 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True, likelihood=None):
             plist.append(
                 NormalizingFlowProposal(priors, weight=big_weight, scale_fits=L1steps)
             )
-        if likelihood is not None:
-            plist.append(
-                FisherMatrixProposal(priors, weight=big_weight, likelihood=likelihood)
-            )
+        plist.append(FisherMatrixProposal(priors, weight=big_weight))
 
     plist = remove_proposals_using_string(plist, string)
     return ProposalCycle(plist)

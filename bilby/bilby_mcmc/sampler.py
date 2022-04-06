@@ -145,7 +145,7 @@ class Bilby_MCMC(MCMCSampler):
         tau_window=None,
         evidence_method="stepping_stone",
         check_point_delta_t=1800,
-        initial_sample="maxL",
+        initial_sample="prior",
     )
 
     def __init__(
@@ -161,7 +161,7 @@ class Bilby_MCMC(MCMCSampler):
         diagnostic=False,
         resume=True,
         exit_code=130,
-        verbose=False,
+        verbose=True,
         **kwargs,
     ):
 
@@ -1149,7 +1149,7 @@ class BilbyMCMCSampler(object):
         Tindex=0,
         Eindex=0,
         use_ratio=False,
-        initial_sample="maxL",
+        initial_sample="prior",
     ):
         self.beta = beta
         self.Tindex = Tindex
@@ -1197,7 +1197,6 @@ class BilbyMCMCSampler(object):
                 _priors,
                 L1steps=self.chain.L1steps,
                 warn=warn,
-                likelihood=_likelihood,
             )
         elif isinstance(proposal_cycle, proposals.ProposalCycle):
             self.proposal_cycle = proposal_cycle
@@ -1247,7 +1246,9 @@ class BilbyMCMCSampler(object):
         while internal_steps < self.chain.L1steps:
             internal_steps += 1
             proposal = self.proposal_cycle.get_proposal()
-            prop, log_factor = proposal(self.chain)
+            prop, log_factor = proposal(
+                self.chain, likelihood=_likelihood, priors=_priors
+            )
             logp = self.log_prior(prop)
 
             if np.isinf(logp) or np.isnan(logp):

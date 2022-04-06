@@ -918,6 +918,9 @@ sky = {
 distance_inclination = {
     "luminosity_distance", "redshift", "theta_jn", "cos_theta_jn",
 }
+measured_spin = {
+    "chi_1", "chi_2", "a_1", "a_2", "chi_1_in_plane"
+}
 
 PARAMETER_SETS = dict(
     spin=spin, mass=mass, phase=phase, extrinsic=extrinsic,
@@ -925,4 +928,5 @@ PARAMETER_SETS = dict(
     intrinsic=spin.union(mass).union(phase).union(tidal),
     precession_only=precession_only,
     sky=sky, distance_inclination=distance_inclination,
+    measured_spin=measured_spin,
 )
