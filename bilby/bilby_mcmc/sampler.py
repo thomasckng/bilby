@@ -380,7 +380,6 @@ class Bilby_MCMC(MCMCSampler):
                 )
                 raise ResumeError(msg)
             self.ptsampler.set_convergence_inputs(self.convergence_inputs)
-            self.ptsampler.proposal_cycle = self.proposal_cycle
             self.ptsampler.pt_rejection_sample = self.pt_rejection_sample
 
         logger.info(

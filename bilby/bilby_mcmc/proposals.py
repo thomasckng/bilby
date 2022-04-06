@@ -798,7 +798,10 @@ class FisherMatrixProposal(AdaptiveGaussianProposal):
         if self.adapt:
             self.update_scale(chain)
         if self.steps_since_update >= self.update_interval:
-            self.iFIM = self.fmp.calculate_iFIM(sample.dict)
+            try:
+                self.iFIM = self.fmp.calculate_iFIM(sample.dict)
+            except RuntimeError:
+                pass
             self.steps_since_update = 0
 
         jump = self.scale * np.random.multivariate_normal(self.mean, self.iFIM)
