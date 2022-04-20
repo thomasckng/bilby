@@ -1172,6 +1172,9 @@ def get_proposal_cycle(string, priors, L1steps=1, warn=True):
         for key in ["time_jitter", "psi", "phi_12", "tilt_2", "lambda_1", "lambda_2"]:
             if key in priors.non_fixed_keys:
                 plist.append(PriorProposal(priors, subset=[key], weight=tiny_weight))
+        for key in ["chirp_mass"]:
+            if key in priors.non_fixed_keys:
+                plist.append(GMMProposal(priors, subset=[key], weight=small_weight))
         if "chi_1_in_plane" in priors and "chi_2_in_plane" in priors:
             in_plane = ["chi_1_in_plane", "chi_2_in_plane", "phi_12"]
             plist.append(UniformProposal(priors, subset=in_plane, weight=tiny_weight))
