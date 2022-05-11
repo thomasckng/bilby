@@ -186,7 +186,7 @@ def lal_binary_neutron_star(
 
 
 def teobresums_eccentric_binary_aligned_spins(
-        time_array, mass_1, mass_2, eccentricity, luminosity_distance, iota,
+        time_array, mass_1, mass_2, eccentricity, luminosity_distance, theta_jn,
         chi_1, chi_2, phase, lambda_1, lambda_2, **kwargs):
     """ Eccentric binary black hole waveform model using TEOBResumS
 
@@ -243,13 +243,13 @@ def teobresums_eccentric_binary_aligned_spins(
     'use_mode_lm'        : k,      # List of modes to use/output through EOBRunPy
     'srate_interp'       : waveform_kwargs['sampling_frequency'],  # srate at which to interpolate. Default = 4096.
     'use_geometric_units': 0,      # Output quantities in geometric units. Default = 1
-    'initial_frequency'  : waveform_kwargs['minimum_frequency'],    # in Hz if use_geometric_units = 0, else in geometric units
+    'initial_frequency'  : waveform_kwargs['reference_frequency'],    # in Hz if use_geometric_units = 0, else in geometric units
     'interp_uniform_grid': 1,      # Interpolate mode by mode on a uniform grid. Default = 0 (no interpolation)
     'distance'           : luminosity_distance,
-    'inclination'        : iota,
+    'inclination'        : theta_jn,
     'output_hpc'         : 0
     }
-
+    print(parameters)
     # Run wf generator
     t, hplus, hcross, hlm, dyn = EOBRun_module.EOBRunPy(parameters)
     waveform = {'plus': hplus, 'cross': hcross}
@@ -282,7 +282,7 @@ def teobresums_eccentric_binary_aligned_spins(
  
 
 def teobresums_eccentric_binary_aligned_spins_frequency_domain(
-        frequency_array, mass_1, mass_2, eccentricity, luminosity_distance, iota,
+        frequency_array, mass_1, mass_2, eccentricity, luminosity_distance, theta_jn,
         chi_1, chi_2, phase, lambda_1, lambda_2, **kwargs):
     """ Eccentric binary black hole waveform model using TEOBResumS
 
@@ -339,10 +339,10 @@ def teobresums_eccentric_binary_aligned_spins_frequency_domain(
     'use_mode_lm'        : k,	   # List of modes to use/output through EOBRunPy
     'srate_interp'	 : waveform_kwargs['sampling_frequency'],  # srate at which to interpolate. Default = 4096.
     'use_geometric_units': 0,	   # Output quantities in geometric units. Default = 1
-    'initial_frequency'  : waveform_kwargs['minimum_frequency'],    # in Hz if use_geometric_units = 0, else in geometric units
+    'initial_frequency'  : waveform_kwargs['reference_frequency'],    # in Hz if use_geometric_units = 0, else in geometric units
     'interp_uniform_grid': 1,	   # Interpolate mode by mode on a uniform grid. Default = 0 (no interpolation)
     'distance'           : luminosity_distance,
-    'inclination'        : iota,
+    'inclination'        : theta_jn,
     'output_hpc'         : 0
     }
 
@@ -352,10 +352,10 @@ def teobresums_eccentric_binary_aligned_spins_frequency_domain(
     # Make sure the signal is the right length
     df = frequency_array[1] - frequency_array[0]
     duration = 1 / df
-    time_length = int(duration * kwargs['sampling_frequency'])
+    time_length = int(duration * waveform_kwargs['sampling_frequency'])
     length_difference = len(waveform_time_domain['plus']) - time_length
     # Apply a Tukey window
-    alpha = roll_off / waveform_kwargs['duration']
+    alpha = roll_off / duration
     window = signal.tukey(len(waveform_time_domain['plus']), alpha)
     # Custom window - avoid cutting off the merger and ringdown
     window[int(len(waveform_time_domain['plus'])/2)::] = 1
@@ -380,7 +380,7 @@ def teobresums_eccentric_binary_aligned_spins_frequency_domain(
     # Fourier transform
     waveform = {}
     for key in waveform_time_domain:
-        waveform[key], _ = utils.nfft(waveform_time_domain[key], kwargs['sampling_frequency'])
+        waveform[key], _ = utils.nfft(waveform_time_domain[key], waveform_kwargs['sampling_frequency'])
 
     # Return waveform 
     return waveform
