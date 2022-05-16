@@ -1,10 +1,9 @@
-import matplotlib.pyplot as plt
-import numpy as np
 from pathlib import Path
 
-import celerite.terms
-
 import bilby
+import celerite.terms
+import matplotlib.pyplot as plt
+import numpy as np
 from bilby.core.prior import Uniform
 
 
