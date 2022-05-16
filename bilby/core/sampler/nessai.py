@@ -134,11 +134,12 @@ class Nessai(NestedSampler):
             out.run(save=True, plot=self.plot)
         except TypeError as e:
             raise TypeError(f"Unable to initialise nessai sampler with error: {e}")
-        except SystemExit as e:
+        except (SystemExit, KeyboardInterrupt) as e:
             import sys
 
             logger.info(
-                f"Caught exit code {e.args[0]}, exiting with signal {self.exit_code}"
+                f"Caught {type(e).__name__} with args {e.args}, "
+                f"exiting with signal {self.exit_code}"
             )
             sys.exit(self.exit_code)
 

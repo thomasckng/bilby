@@ -38,7 +38,7 @@ _sampler_kwargs = dict(
         bound="single",
     ),
     emcee=dict(iterations=1000, nwalkers=10),
-    kombine=dict(iterations=2000, nwalkers=20, autoburnin=False),
+    kombine=dict(iterations=200, nwalkers=10, autoburnin=False),
     nessai=dict(
         nlive=100,
         poolsize=1000,
@@ -94,6 +94,7 @@ class TestRunningSamplers(unittest.TestCase):
         self.priors = bilby.core.prior.PriorDict()
         self.priors["m"] = bilby.core.prior.Uniform(0, 5, boundary="periodic")
         self.priors["c"] = bilby.core.prior.Uniform(-2, 2, boundary="reflective")
+        self._remove_tree()
         bilby.core.utils.check_directory_exists_and_if_not_mkdir("outdir")
 
     @staticmethod
@@ -107,7 +108,13 @@ class TestRunningSamplers(unittest.TestCase):
         del self.likelihood
         del self.priors
         bilby.core.utils.command_line_args.bilby_test_mode = False
-        shutil.rmtree("outdir")
+        self._remove_tree()
+
+    def _remove_tree(self):
+        try:
+            shutil.rmtree("outdir")
+        except OSError:
+            pass
 
     @parameterized.expand(_sampler_kwargs.keys())
     def test_run_sampler_single(self, sampler):
@@ -152,9 +159,9 @@ class TestRunningSamplers(unittest.TestCase):
             pytest.skip(f"{sampler} cannot be parallelized")
         if sys.version_info.minor == 8 and sampler.lower == "cpnest":
             pytest.skip("Pool interrupting broken for cpnest with py3.8")
-        if sampler.lower == "nessai" and pool_size > 1:
+        if sampler.lower() == "nessai" and pool_size > 1:
             pytest.skip(
-                "Interrupting pool is failing in pytest. "
+                "Interrupting with a pool is failing in pytest. "
                 "Likely due to interactions with the signal handling in nessai."
             )
         pid = os.getpid()
@@ -171,7 +178,7 @@ class TestRunningSamplers(unittest.TestCase):
 
         self.likelihood._func = slow_func
 
-        with self.assertRaises(SystemExit):
+        with self.assertRaises((SystemExit, KeyboardInterrupt)):
             try:
                 while True:
                     self._run_sampler(sampler=sampler, pool_size=pool_size, exit_code=5)
