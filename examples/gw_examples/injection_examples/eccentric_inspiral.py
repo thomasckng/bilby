@@ -15,7 +15,7 @@ duration = 64
 sampling_frequency = 256
 
 outdir = "outdir"
-label = "eccentric_GW140914"
+label = "eccentric_GW150914"
 bilby.core.utils.setup_logger(outdir=outdir, label=label)
 
 # Set up a random seed for result reproducibility.
