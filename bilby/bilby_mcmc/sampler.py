@@ -372,6 +372,9 @@ class Bilby_MCMC(MCMCSampler):
     def write_current_state(self):
         import dill
 
+        if not hasattr(self, "ptsampler"):
+            logger.debug("Attempted checkpoint before initialization")
+            return
         logger.debug("Check point")
         check_directory_exists_and_if_not_mkdir(self.outdir)
 
