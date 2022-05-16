@@ -148,6 +148,7 @@ python-3.9:
   stage: test
   script:
     - python -m pip install .
+    - python -m pip install schwimmbad
     - python -m pip list installed
 
     - pytest test/integration/sampler_run_test.py --durations 10 -v
