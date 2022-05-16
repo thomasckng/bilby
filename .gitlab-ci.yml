@@ -38,10 +38,6 @@ containers:
 .test-python: &test-python
   stage: initial
   image: python
-  before_script:
-    # this is required because pytables doesn't use a wheel on py37
-    - apt-get -yqq update
-    - apt-get -yqq install libhdf5-dev
   script:
     - python -m pip install .
     - python -m pip list installed
@@ -108,6 +104,15 @@ precommits-py3.9:
 #  variables:
 #    CACHE_DIR: ".pip310"
 #    PYVERSION: "python310"
+
+install:
+  stage: initial
+  parallel:
+    matrix:
+      - EXTRA: [gw, mcmc, all]
+  image: containers.ligo.org/lscsoft/bilby/v2-bilby-python39
+  script:
+    - pip install .[$EXTRA]
 
 # ------------------- Test stage -------------------------------------------
 
@@ -213,7 +218,7 @@ docs:
   image: containers.ligo.org/lscsoft/bilby/v2-bilby-python39
   before_script:
     - conda install -c conda-forge pandoc -y
-    - python -m pip install ipykernel ipython jupyter
+    - python -m pip install --upgrade ipykernel ipython jupyter nbconvert
     - python -m ipykernel install
   script:
     # Make the documentation
@@ -230,7 +235,7 @@ docs:
 
 # ------------------- Deploy stage -------------------------------------------
 
-deploy-docs:
+pages:
   stage: deploy
   needs: ["docs", "python-3.9"]
   script:

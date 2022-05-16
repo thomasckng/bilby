@@ -26,16 +26,30 @@ gw_args = [(fname.split("/")[-1][:-3], fname) for fname in gw_examples]
 
 
 def _execute_file(name, fname):
-    print("Running {}".format(fname))
+    dname, fname = os.path.split(fname)
+    old_directory = os.getcwd()
+    os.chdir(dname)
     spec = importlib.util.spec_from_file_location(name, fname)
     foo = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(foo)
+    os.chdir(old_directory)
 
 
 class ExampleTest(unittest.TestCase):
     outdir = "outdir"
     dir_path = os.path.dirname(os.path.realpath(__file__))
     dir_path = os.path.abspath(os.path.join(dir_path, os.path.pardir))
+
+    def setUp(self):
+        self.init_dir = os.getcwd()
+
+    def tearDown(self):
+        if os.path.isdir(self.outdir):
+            try:
+                shutil.rmtree(self.outdir)
+            except OSError:
+                logging.warning("{} not removed after tests".format(self.outdir))
+        os.chdir(self.init_dir)
 
     @classmethod
     def setUpClass(cls):

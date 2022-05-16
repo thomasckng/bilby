@@ -1,10 +1,15 @@
+"""
+A collection of functions to convert between parameters describing
+gravitational-wave sources.
+"""
+
 import os
 import sys
 import multiprocessing
 import pickle
 
 import numpy as np
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 from ..core.likelihood import MarginalizedLikelihoodReconstructionError
 from ..core.utils import logger, solar_mass, command_line_args
@@ -24,17 +29,19 @@ def redshift_to_comoving_distance(redshift, cosmology=None):
     return cosmology.comoving_distance(redshift).value
 
 
-@np.vectorize
 def luminosity_distance_to_redshift(distance, cosmology=None):
     from astropy import units
     cosmology = get_cosmology(cosmology)
+    if isinstance(distance, Series):
+        distance = distance.values
     return z_at_value(cosmology.luminosity_distance, distance * units.Mpc)
 
 
-@np.vectorize
 def comoving_distance_to_redshift(distance, cosmology=None):
     from astropy import units
     cosmology = get_cosmology(cosmology)
+    if isinstance(distance, Series):
+        distance = distance.values
     return z_at_value(cosmology.comoving_distance, distance * units.Mpc)
 
 
@@ -50,33 +57,44 @@ def luminosity_distance_to_comoving_distance(distance, cosmology=None):
     return redshift_to_comoving_distance(redshift, cosmology)
 
 
+_cosmology_docstring = """
+Convert from {input} to {output}
+
+Parameters
+----------
+{input}: float
+    The {input} to convert.
+cosmology: astropy.cosmology.Cosmology
+    The cosmology to use for the transformation.
+    See :code:`bilby.gw.cosmology.get_cosmology` for details of how to
+    specify this.
+
+Returns
+-------
+float
+    The {output} corresponding to the provided {input}.
+"""
+
+for _func in [
+    comoving_distance_to_luminosity_distance,
+    comoving_distance_to_redshift,
+    luminosity_distance_to_comoving_distance,
+    luminosity_distance_to_redshift,
+    redshift_to_comoving_distance,
+    redshift_to_luminosity_distance,
+]:
+    input, output = _func.__name__.split("_to_")
+    _func.__doc__ = _cosmology_docstring.format(input=input, output=output)
+
+
 def bilby_to_lalsimulation_spins(
-        theta_jn, phi_jl, tilt_1, tilt_2, phi_12, a_1, a_2, mass_1, mass_2,
-        reference_frequency, phase):
-    if (a_1 == 0 or tilt_1 in [0, np.pi]) and (a_2 == 0 or tilt_2 in [0, np.pi]):
-        spin_1x = 0
-        spin_1y = 0
-        spin_1z = a_1 * np.cos(tilt_1)
-        spin_2x = 0
-        spin_2y = 0
-        spin_2z = a_2 * np.cos(tilt_2)
-        iota = theta_jn
-    else:
-        iota, spin_1x, spin_1y, spin_1z, spin_2x, spin_2y, spin_2z = \
-            transform_precessing_spins(
-                theta_jn, phi_jl, tilt_1, tilt_2, phi_12, a_1, a_2, mass_1,
-                mass_2, reference_frequency, phase)
-    return iota, spin_1x, spin_1y, spin_1z, spin_2x, spin_2y, spin_2z
-
-
-@np.vectorize
-def transform_precessing_spins(theta_jn, phi_jl, tilt_1, tilt_2, phi_12, a_1,
-                               a_2, mass_1, mass_2, reference_frequency, phase):
+    theta_jn, phi_jl, tilt_1, tilt_2, phi_12, a_1, a_2, mass_1, mass_2,
+    reference_frequency, phase
+):
     """
-    Vectorized version of
-    lalsimulation.SimInspiralTransformPrecessingNewInitialConditions
+    Convert from Bilby spin parameters to lalsimulation ones.
 
-    All parameters are defined at the reference frequency
+    All parameters are defined at the reference frequency and in SI units.
 
     Parameters
     ==========
@@ -95,9 +113,9 @@ def transform_precessing_spins(theta_jn, phi_jl, tilt_1, tilt_2, phi_12, a_1,
     a_2: float
         Secondary dimensionless spin magnitude
     mass_1: float
-        Primary mass _in SI units_
+        Primary mass in SI units
     mass_2: float
-        Secondary mass _in SI units_
+        Secondary mass in SI units
     reference_frequency: float
     phase: float
         Orbital phase
@@ -109,13 +127,40 @@ def transform_precessing_spins(theta_jn, phi_jl, tilt_1, tilt_2, phi_12, a_1,
     spin_1x, spin_1y, spin_1z, spin_2x, spin_2y, spin_2z: float
         Cartesian spin components
     """
-
-    iota, spin_1x, spin_1y, spin_1z, spin_2x, spin_2y, spin_2z = (
-        lalsim_SimInspiralTransformPrecessingNewInitialConditions(
-            theta_jn, phi_jl, tilt_1, tilt_2, phi_12, a_1, a_2, mass_1, mass_2,
-            reference_frequency, phase))
-
+    if (a_1 == 0 or tilt_1 in [0, np.pi]) and (a_2 == 0 or tilt_2 in [0, np.pi]):
+        spin_1x = 0
+        spin_1y = 0
+        spin_1z = a_1 * np.cos(tilt_1)
+        spin_2x = 0
+        spin_2y = 0
+        spin_2z = a_2 * np.cos(tilt_2)
+        iota = theta_jn
+    else:
+        from numbers import Number
+        args = (
+            theta_jn, phi_jl, tilt_1, tilt_2, phi_12, a_1, a_2, mass_1,
+            mass_2, reference_frequency, phase
+        )
+        float_inputs = all([isinstance(arg, Number) for arg in args])
+        if float_inputs:
+            func = lalsim_SimInspiralTransformPrecessingNewInitialConditions
+        else:
+            func = transform_precessing_spins
+        iota, spin_1x, spin_1y, spin_1z, spin_2x, spin_2y, spin_2z = func(*args)
     return iota, spin_1x, spin_1y, spin_1z, spin_2x, spin_2y, spin_2z
+
+
+@np.vectorize
+def transform_precessing_spins(*args):
+    """
+    Vectorized wrapper for
+    lalsimulation.SimInspiralTransformPrecessingNewInitialConditions
+
+    For detailed documentation see
+    :code:`bilby.gw.conversion.bilby_to_lalsimulation_spins`.
+    This will be removed from the public API in a future release.
+    """
+    return lalsim_SimInspiralTransformPrecessingNewInitialConditions(*args)
 
 
 def convert_to_lal_binary_black_hole_parameters(parameters):
@@ -906,6 +951,29 @@ def generate_all_bns_parameters(sample, likelihood=None, priors=None, npool=1):
 
 
 def generate_specific_parameters(sample, parameters):
+    """
+    Generate a specific subset of parameters that can be generated.
+
+    Parameters
+    ----------
+    sample: dict
+        The input sample to be converted.
+    parameters: list
+        The list of parameters to return.
+
+    Returns
+    -------
+    output_sample: dict
+        The converted parameters
+
+    Notes
+    -----
+    This is _not_ an optimized function. Under the hood, it generates all
+    possible parameters and then downselects.
+
+    If the passed :code:`parameters` do not include the input parameters,
+    those will not be returned.
+    """
     updated_sample = generate_all_bns_parameters(sample=sample.copy())
     output_sample = sample.__class__()
     for key in parameters:
