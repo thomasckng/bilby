@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from ..utils import logger
-from .base_sampler import NestedSampler, _TemporaryFileSampler, signal_wrapper
+from .base_sampler import NestedSampler, _TemporaryFileSamplerMixin, signal_wrapper
 
 
 class _DNest4Model(object):
@@ -61,7 +61,7 @@ class _DNest4Model(object):
         return (x - minimum) % (maximum - minimum) + minimum
 
 
-class DNest4(_TemporaryFileSampler, NestedSampler):
+class DNest4(_TemporaryFileSamplerMixin, NestedSampler):
 
     """
     Bilby wrapper of DNest4

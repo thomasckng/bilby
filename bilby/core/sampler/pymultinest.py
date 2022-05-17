@@ -6,10 +6,10 @@ import time
 import numpy as np
 
 from ..utils import logger
-from .base_sampler import NestedSampler, _TemporaryFileSampler, signal_wrapper
+from .base_sampler import NestedSampler, _TemporaryFileSamplerMixin, signal_wrapper
 
 
-class Pymultinest(_TemporaryFileSampler, NestedSampler):
+class Pymultinest(_TemporaryFileSamplerMixin, NestedSampler):
     """
     bilby wrapper of pymultinest
     (https://github.com/JohannesBuchner/PyMultiNest)

@@ -6,10 +6,10 @@ import numpy as np
 from pandas import DataFrame
 
 from ..utils import logger
-from .base_sampler import NestedSampler, _TemporaryFileSampler, signal_wrapper
+from .base_sampler import NestedSampler, _TemporaryFileSamplerMixin, signal_wrapper
 
 
-class Ultranest(_TemporaryFileSampler, NestedSampler):
+class Ultranest(_TemporaryFileSamplerMixin, NestedSampler):
     """
     bilby wrapper of ultranest
     (https://johannesbuchner.github.io/UltraNest/index.html)

@@ -855,12 +855,20 @@ class MCMCSampler(Sampler):
             logger.info(f"Unable to calculate autocorr time: {e}")
 
 
-class _TemporaryFileSampler:
+class _TemporaryFileSamplerMixin:
+    """
+    A mixin class to handle storing sampler intermediate products in a temporary
+    location. See, e.g., `this SO <https://stackoverflow.com/a/547714>` for a
+    basic background on mixins.
+
+    This class makes sure that any subclasses can seamlessly use the temporary
+    file functionality.
+    """
 
     short_name = ""
 
     def __init__(self, temporary_directory, **kwargs):
-        super(_TemporaryFileSampler, self).__init__(**kwargs)
+        super(_TemporaryFileSamplerMixin, self).__init__(**kwargs)
         self.use_temporary_directory = temporary_directory
         self._outputfiles_basename = None
         self._temporary_outputfiles_basename = None
