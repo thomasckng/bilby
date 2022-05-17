@@ -90,7 +90,7 @@ for key in [
     "phase",
 ]:
     priors[key] = injection_parameters[key]
-priors.pop("theta_jn")
+del priors["theta_jn"]
 priors["cos_theta_jn"] = np.cos(injection_parameters["theta_jn"])
 print(priors)
 

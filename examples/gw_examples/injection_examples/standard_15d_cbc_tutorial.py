@@ -68,7 +68,7 @@ ifos = bilby.gw.detector.InterferometerList(["H1", "L1"])
 ifos.set_strain_data_from_power_spectral_densities(
     sampling_frequency=sampling_frequency,
     duration=duration,
-    start_time=injection_parameters["geocent_time"] - 3,
+    start_time=injection_parameters["geocent_time"] - 2,
 )
 
 ifos.inject_signal(
@@ -105,7 +105,7 @@ priors["azimuth"] = bilby.core.prior.Uniform(
 
 # Initialise the likelihood by passing in the interferometer data (ifos) and
 # the waveoform generator, as well the priors.
-# The explicit distance, phase marginalization are turned on to improve
+# The explicit distance marginalization is turned on to improve
 # convergence, and the posterior is recovered by the conversion function.
 likelihood = bilby.gw.GravitationalWaveTransient(
     interferometers=ifos,
@@ -122,8 +122,7 @@ likelihood = bilby.gw.GravitationalWaveTransient(
 # Note that the `walks`, `nact`, and `maxmcmc` parameter are specified
 # to ensure sufficient convergence of the analysis.
 # We set `npool=4` to parallelize the analysis over four cores.
-# The conversion function will determine the distance, phase and coalescence
-# time posteriors in post processing.
+# The conversion function will determine the distance posterior in post processing
 result = bilby.run_sampler(
     likelihood=likelihood,
     priors=priors,

@@ -63,7 +63,7 @@ for ifo in ifos:
 ifos.set_strain_data_from_power_spectral_densities(
     sampling_frequency=sampling_frequency,
     duration=duration,
-    start_time=injection_parameters["geocent_time"] - 3,
+    start_time=injection_parameters["geocent_time"] + 2 - duration,
 )
 ifos.inject_signal(
     waveform_generator=waveform_generator, parameters=injection_parameters

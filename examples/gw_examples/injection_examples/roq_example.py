@@ -78,7 +78,7 @@ ifos = bilby.gw.detector.InterferometerList(["H1", "L1", "V1"])
 ifos.set_strain_data_from_power_spectral_densities(
     sampling_frequency=sampling_frequency,
     duration=duration,
-    start_time=injection_parameters["geocent_time"] - 3 / scale_factor,
+    start_time=injection_parameters["geocent_time"] - 2 / scale_factor,
 )
 ifos.inject_signal(
     waveform_generator=waveform_generator, parameters=injection_parameters
@@ -125,7 +125,9 @@ priors["chirp_mass"] = bilby.core.prior.Uniform(
     minimum=float(minimum_chirp_mass),
     maximum=float(maximum_chirp_mass),
 )
-priors["mass_ratio"] = bilby.core.prior.Uniform(0.125, 1, name="mass_ratio")
+# The roq parameters typically store the mass ratio bounds as m1/m2 not m2/m1 as in the
+# Bilby convention.
+priors["mass_ratio"] = bilby.core.prior.Uniform(1 / params["qmax"], 1, name="mass_ratio")
 priors["geocent_time"] = bilby.core.prior.Uniform(
     injection_parameters["geocent_time"] - 0.1,
     injection_parameters["geocent_time"] + 0.1,
