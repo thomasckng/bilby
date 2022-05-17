@@ -127,7 +127,9 @@ priors["chirp_mass"] = bilby.core.prior.Uniform(
 )
 # The roq parameters typically store the mass ratio bounds as m1/m2 not m2/m1 as in the
 # Bilby convention.
-priors["mass_ratio"] = bilby.core.prior.Uniform(1 / params["qmax"], 1, name="mass_ratio")
+priors["mass_ratio"] = bilby.core.prior.Uniform(
+    1 / params["qmax"], 1, name="mass_ratio"
+)
 priors["geocent_time"] = bilby.core.prior.Uniform(
     injection_parameters["geocent_time"] - 0.1,
     injection_parameters["geocent_time"] + 0.1,
