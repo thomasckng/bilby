@@ -563,7 +563,6 @@ class TestInterferometerAntennaPatternAgainstLAL(unittest.TestCase):
                 with self.subTest(':'.join((ifo_name, pol))):
                     self.assertAlmostEqual(std[m], 0.0, places=7)
 
-
     def test_time_delay_vs_lal(self):
         delays = np.zeros(self.trial)
 
@@ -582,7 +581,6 @@ class TestInterferometerAntennaPatternAgainstLAL(unittest.TestCase):
             std = max(abs(delays))
             with self.subTest(ifo_name):
                 self.assertAlmostEqual(std, 0.0, places=10)
-
 
 
 if __name__ == "__main__":
