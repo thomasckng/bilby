@@ -289,6 +289,37 @@ class Interferometer(object):
         array_like: A 3x3 array representation of the detector response (signal observed in the interferometer)
         """
 
+        # print("Original P&C:")
+        # print(waveform_polarizations['plus'].max())
+        # print(waveform_polarizations['cross'].max())    
+
+        waveform_polarizations_transform = {}
+        waveform_polarizations_transform['left'] = (waveform_polarizations['plus'] - (waveform_polarizations['cross'] * 1j)) / np.sqrt(2)
+        waveform_polarizations_transform['right'] = (waveform_polarizations['plus'] + (waveform_polarizations['cross'] * 1j)) / np.sqrt(2)
+
+        # print("Original L&R:")
+        # print(waveform_polarizations_transform['left'].max())
+        # print(waveform_polarizations_transform['right'].max())
+
+        # print("exp check:")
+        # print("Comoving Distance: ",luminosity_distance_to_comoving_distance(parameters['luminosity_distance']))
+        # print("kappa: ",parameters['kappa'])
+        # print("exp: ",np.exp(-2 * luminosity_distance_to_comoving_distance(parameters['luminosity_distance']) * parameters['kappa']))
+
+        waveform_polarizations_transform['left'] *= np.exp(-2 * luminosity_distance_to_comoving_distance(parameters['luminosity_distance']) * parameters['kappa'])
+        
+        # print("Edited L&R:")
+        # print(waveform_polarizations_transform['left'].max())
+        # print(waveform_polarizations_transform['right'].max())
+
+        waveform_polarizations['plus'] = ((waveform_polarizations_transform['left'] + waveform_polarizations_transform['right']) * np.sqrt(2)) / 2
+        waveform_polarizations['cross'] = ((waveform_polarizations_transform['right'] - waveform_polarizations_transform['left']) * np.sqrt(2)) / 2j
+
+        # print("Edited P&C:")
+        # print(waveform_polarizations['plus'].max())
+        # print(waveform_polarizations['cross'].max()) 
+        # print()
+
         signal = {}
         for mode in waveform_polarizations.keys():
             det_response = self.antenna_response(
@@ -298,37 +329,6 @@ class Interferometer(object):
                 parameters['psi'], mode)
 
             signal[mode] = waveform_polarizations[mode] * det_response
-
-        # print("Original P&C:")
-        # print(signal['plus'].max())
-        # print(signal['cross'].max())    
-
-        signal_transform = {}
-        signal_transform['left'] = (signal['plus'] - (signal['cross'] * 1j)) / np.sqrt(2)
-        signal_transform['right'] = (signal['plus'] + (signal['cross'] * 1j)) / np.sqrt(2)
-
-        # print("Original L&R:")
-        # print(signal_transform['left'].max())
-        # print(signal_transform['right'].max())
-
-        # print("exp check:")
-        # print("Comoving Distance: ",luminosity_distance_to_comoving_distance(parameters['luminosity_distance']))
-        # print("kappa: ",parameters['kappa'])
-        # print("exp: ",np.exp(-2 * luminosity_distance_to_comoving_distance(parameters['luminosity_distance']) * parameters['kappa']))
-
-        signal_transform['left'] *= np.exp(-2 * luminosity_distance_to_comoving_distance(parameters['luminosity_distance']) * parameters['kappa'])
-        
-        # print("Edited L&R:")
-        # print(signal_transform['left'].max())
-        # print(signal_transform['right'].max())
-
-        signal['plus'] = ((waveform_polarizations_transform['left'] + waveform_polarizations_transform['right']) * np.sqrt(2)) / 2
-        signal['cross'] = ((waveform_polarizations_transform['right'] - waveform_polarizations_transform['left']) * np.sqrt(2)) / 2j
-
-        # print("Edited P&C:")
-        # print(signal['plus'].max())
-        # print(signal['cross'].max()) 
-        # print()
 
         signal_ifo = sum(signal.values())
 
