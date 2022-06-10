@@ -8,7 +8,7 @@ from .. import utils as gwutils
 from .calibration import Recalibrate
 from .geometry import InterferometerGeometry
 from .strain_data import InterferometerStrainData
-from ..conversion import generate_all_bbh_parameters
+from ..conversion import generate_all_bbh_parameters, luminosity_distance_to_comoving_distance
 
 
 class Interferometer(object):
@@ -297,10 +297,38 @@ class Interferometer(object):
                 parameters['geocent_time'],
                 parameters['psi'], mode)
 
-            if mode == 'cross':
-                signal[mode] = 0
-            else:
-                signal[mode] = waveform_polarizations[mode] * det_response
+            signal[mode] = waveform_polarizations[mode] * det_response
+
+        # print("Original P&C:")
+        # print(signal['plus'].max())
+        # print(signal['cross'].max())    
+
+        signal_transform = {}
+        signal_transform['left'] = (signal['plus'] - (signal['cross'] * 1j)) / np.sqrt(2)
+        signal_transform['right'] = (signal['plus'] + (signal['cross'] * 1j)) / np.sqrt(2)
+
+        # print("Original L&R:")
+        # print(signal_transform['left'].max())
+        # print(signal_transform['right'].max())
+
+        # print("exp check:")
+        # print("Comoving Distance: ",luminosity_distance_to_comoving_distance(parameters['luminosity_distance']))
+        # print("kappa: ",parameters['kappa'])
+        # print("exp: ",np.exp(-2 * luminosity_distance_to_comoving_distance(parameters['luminosity_distance']) * parameters['kappa']))
+
+        signal_transform['left'] *= np.exp(-2 * luminosity_distance_to_comoving_distance(parameters['luminosity_distance']) * parameters['kappa'])
+        
+        # print("Edited L&R:")
+        # print(signal_transform['left'].max())
+        # print(signal_transform['right'].max())
+
+        signal['plus'] = ((waveform_polarizations_transform['left'] + waveform_polarizations_transform['right']) * np.sqrt(2)) / 2
+        signal['cross'] = ((waveform_polarizations_transform['right'] - waveform_polarizations_transform['left']) * np.sqrt(2)) / 2j
+
+        # print("Edited P&C:")
+        # print(signal['plus'].max())
+        # print(signal['cross'].max()) 
+        # print()
 
         signal_ifo = sum(signal.values())
 
