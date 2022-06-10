@@ -288,6 +288,7 @@ class Interferometer(object):
         =======
         array_like: A 3x3 array representation of the detector response (signal observed in the interferometer)
         """
+
         signal = {}
         for mode in waveform_polarizations.keys():
             det_response = self.antenna_response(
@@ -296,7 +297,11 @@ class Interferometer(object):
                 parameters['geocent_time'],
                 parameters['psi'], mode)
 
-            signal[mode] = waveform_polarizations[mode] * det_response
+            if mode == 'cross':
+                signal[mode] = 0
+            else:
+                signal[mode] = waveform_polarizations[mode] * det_response
+
         signal_ifo = sum(signal.values())
 
         signal_ifo *= self.strain_data.frequency_mask
