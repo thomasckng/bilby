@@ -303,11 +303,11 @@ class Interferometer(object):
         waveform_polarizations_transform['left'] = (waveform_polarizations['plus'] - (waveform_polarizations['cross'] * 1j)) / np.sqrt(2)
         waveform_polarizations_transform['right'] = (waveform_polarizations['plus'] + (waveform_polarizations['cross'] * 1j)) / np.sqrt(2)
 
-        print("Original L&R:")
+        # print("Original L&R:")
         # print(waveform_polarizations_transform['left'].max())
         # print(waveform_polarizations_transform['right'].max())
-        print("waveform_polarizations_transform['left'] size:", waveform_polarizations_transform['left'].size)
-        print("waveform_polarizations_transform['right'] size:", waveform_polarizations_transform['right'].size)
+        # print("waveform_polarizations_transform['left'] size:", waveform_polarizations_transform['left'].size)
+        # print("waveform_polarizations_transform['right'] size:", waveform_polarizations_transform['right'].size)
 
         # print("exp check:")
         # print("Comoving Distance: ",luminosity_distance_to_comoving_distance(parameters['luminosity_distance']))
@@ -319,11 +319,11 @@ class Interferometer(object):
         waveform_polarizations_transform['left'] *= np.exp(luminosity_distance_to_comoving_distance(parameters['luminosity_distance']) * parameters['kappa'] * (frequency_array / 100))
         waveform_polarizations_transform['right'] *= np.exp(-1 * luminosity_distance_to_comoving_distance(parameters['luminosity_distance']) * parameters['kappa'] * (frequency_array / 100)) 
         
-        print("Edited L&R:")
+        # print("Edited L&R:")
         # print(waveform_polarizations_transform['left'].max())
         # print(waveform_polarizations_transform['right'].max())
-        print("waveform_polarizations_transform['left'] size:", waveform_polarizations_transform['left'].size)
-        print("waveform_polarizations_transform['right'] size:", waveform_polarizations_transform['right'].size)
+        # print("waveform_polarizations_transform['left'] size:", waveform_polarizations_transform['left'].size)
+        # print("waveform_polarizations_transform['right'] size:", waveform_polarizations_transform['right'].size)
 
         waveform_polarizations['plus'] = ((waveform_polarizations_transform['left'] + waveform_polarizations_transform['right']) * np.sqrt(2)) / 2
         waveform_polarizations['cross'] = ((waveform_polarizations_transform['right'] - waveform_polarizations_transform['left']) * np.sqrt(2)) / 2j
