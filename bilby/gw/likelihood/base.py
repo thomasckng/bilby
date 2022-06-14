@@ -564,7 +564,7 @@ class GravitationalWaveTransient(Likelihood):
             ifo_length = len(ifo.frequency_domain_strain)
             mask = ifo.frequency_mask
             signal = ifo.get_detector_response(
-                signal_polarizations, self.parameters)
+                signal_polarizations, self.waveform_generator.frequency_array, self.parameters)
             signal_long[:ifo_length] = signal
             data[:ifo_length] = np.conj(ifo.frequency_domain_strain)
             psd[:ifo_length][mask] = ifo.power_spectral_density_array[mask]
