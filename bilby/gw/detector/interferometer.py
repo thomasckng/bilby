@@ -407,7 +407,7 @@ class Interferometer(object):
                 logger.warning(msg)
 
     def inject_signal(self, parameters, injection_polarizations=None,
-                      waveform_generator=None, raise_error=True):
+                      waveform_generator=None, frequency_array=None, raise_error=True):
         """ General signal injection method.
         Provide the injection parameters and either the injection polarizations
         or the waveform generator to inject a signal into the detector.
@@ -451,10 +451,10 @@ class Interferometer(object):
                 "injection_polarizations.")
         elif injection_polarizations is not None:
             self.inject_signal_from_waveform_polarizations(parameters=parameters,
-                                                           injection_polarizations=injection_polarizations)
+                                                           injection_polarizations=injection_polarizations, frequency_array=frequency_array)
         elif waveform_generator is not None:
             injection_polarizations = self.inject_signal_from_waveform_generator(parameters=parameters,
-                                                                                 waveform_generator=waveform_generator)
+                                                                                 waveform_generator=waveform_generator, frequency_array=waveform_generator.frequency_array)
         return injection_polarizations
 
     def inject_signal_from_waveform_generator(self, parameters, waveform_generator):
