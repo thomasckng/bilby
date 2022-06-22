@@ -483,10 +483,10 @@ class Interferometer(object):
         injection_polarizations = \
             waveform_generator.frequency_domain_strain(parameters)
         self.inject_signal_from_waveform_polarizations(parameters=parameters,
-                                                       injection_polarizations=injection_polarizations)
+                                                       injection_polarizations=injection_polarizations, frequency_array=waveform_generator.frequency_array)
         return injection_polarizations
 
-    def inject_signal_from_waveform_polarizations(self, parameters, injection_polarizations):
+    def inject_signal_from_waveform_polarizations(self, parameters, injection_polarizations, frequency_array):
         """ Inject a signal into the detector from a dict of waveform polarizations.
         Alternative to `inject_signal` and `inject_signal_from_waveform_generator`.
 
@@ -504,7 +504,7 @@ class Interferometer(object):
                 'Injecting signal outside segment, start_time={}, merger time={}.'
                 .format(self.strain_data.start_time, parameters['geocent_time']))
 
-        signal_ifo = self.get_detector_response(injection_polarizations, parameters)
+        signal_ifo = self.get_detector_response(injection_polarizations, frequency_array, parameters)
         self.strain_data.frequency_domain_strain += signal_ifo
 
         self.meta_data['optimal_SNR'] = (
