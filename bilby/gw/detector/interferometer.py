@@ -316,8 +316,8 @@ class Interferometer(object):
 
         # print(frequency_array)
 
-        waveform_polarizations_transform['left'] *= np.exp(luminosity_distance_to_comoving_distance(parameters['luminosity_distance']) * parameters['kappa'] * (frequency_array / 100))
-        waveform_polarizations_transform['right'] *= np.exp(-1 * luminosity_distance_to_comoving_distance(parameters['luminosity_distance']) * parameters['kappa'] * (frequency_array / 100)) 
+        waveform_polarizations_transform['left'] *= np.exp((luminosity_distance_to_comoving_distance(parameters['luminosity_distance'])/1000) * parameters['kappa'] * (frequency_array / 100))
+        waveform_polarizations_transform['right'] *= np.exp(-1 * (luminosity_distance_to_comoving_distance(parameters['luminosity_distance'])/1000) * parameters['kappa'] * (frequency_array / 100)) 
         
         # print("Edited L&R:")
         # print(waveform_polarizations_transform['left'].max())
