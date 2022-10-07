@@ -1006,33 +1006,60 @@ def fill_from_fixed_priors(sample, priors):
     return output_sample
 
 
-def generate_mass_parameters(sample):
+def generate_mass_parameters(sample, source=False):
     """
-    Add the known mass parameters to the data frame/dictionary.
+    Add the known mass parameters to the data frame/dictionary.  We do
+    not recompute keys already present in the dictionary
 
-    We add:
-        chirp mass, total mass, symmetric mass ratio, mass ratio
+    We add, potentially:
+        chirp mass, total mass, symmetric mass ratio, mass ratio, mass_1, mass_2
 
     Parameters
     ==========
     sample : dict
-        The input dictionary with component masses 'mass_1' and 'mass_2'
-
+        The input dictionary with two "spanning" mass parameters
+        e.g. (mass_1, mass_2), or (chirp_mass, mass_ratio), but not e.g. only
+        (mass_ratio, symmetric_mass_ratio)
     Returns
     =======
     dict: The updated dictionary
 
     """
-    output_sample = sample.copy()
-    output_sample['chirp_mass'] =\
-        component_masses_to_chirp_mass(sample['mass_1'], sample['mass_2'])
-    output_sample['total_mass'] =\
-        component_masses_to_total_mass(sample['mass_1'], sample['mass_2'])
-    output_sample['symmetric_mass_ratio'] =\
-        component_masses_to_symmetric_mass_ratio(sample['mass_1'],
-                                                 sample['mass_2'])
-    output_sample['mass_ratio'] =\
-        component_masses_to_mass_ratio(sample['mass_1'], sample['mass_2'])
+    # Only add the parameters if they're not already present
+    intermediate_sample = generate_component_masses(sample, source=source)
+    output_sample = intermediate_sample.copy()
+
+    if source:
+        mass_1_key = 'mass_1_source'
+        mass_2_key = 'mass_2_source'
+        total_mass_key = 'total_mass_source'
+        chirp_mass_key = 'chirp_mass_source'
+    else:
+        mass_1_key = 'mass_1'
+        mass_2_key = 'mass_2'
+        total_mass_key = 'total_mass'
+        chirp_mass_key = 'chirp_mass'
+
+    if chirp_mass_key not in output_sample.keys():
+        output_sample[chirp_mass_key] = (
+            component_masses_to_chirp_mass(output_sample[mass_1_key],
+                                           output_sample[mass_2_key])
+        )
+    if total_mass_key not in output_sample.keys():
+        output_sample[total_mass_key] = (
+            component_masses_to_total_mass(output_sample[mass_1_key],
+                                           output_sample[mass_2_key])
+        )
+    if 'symmetric_mass_ratio' not in output_sample.keys():
+        output_sample['symmetric_mass_ratio'] = (
+            component_masses_to_symmetric_mass_ratio(output_sample[mass_1_key],
+                                                     output_sample[mass_2_key])
+        )
+    if 'mass_ratio' not in output_sample.keys():
+        output_sample['mass_ratio'] = (
+            component_masses_to_mass_ratio(output_sample[mass_1_key],
+                                           output_sample[mass_2_key])
+        )
 
     return output_sample
 
