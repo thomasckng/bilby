@@ -166,7 +166,6 @@ class InterferometerList(list):
                 injection_polarizations = waveform_generator.frequency_domain_strain(
                     parameters
                 )
-                frequency_array = waveform_generator.frequency_array
             else:
                 raise ValueError(
                     "inject_signal needs one of waveform_generator or "
@@ -179,8 +178,8 @@ class InterferometerList(list):
                 interferometer.inject_signal(
                     parameters=parameters,
                     injection_polarizations=injection_polarizations,
-                    frequency_array=frequency_array,
-                    raise_error=raise_error
+                    frequency_array=waveform_generator.frequency_array,
+                    raise_error=raise_error,
                 )
             )
 

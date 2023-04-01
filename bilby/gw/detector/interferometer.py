@@ -1,6 +1,4 @@
 import os
-from tkinter.tix import X_REGION
-import wave
 
 import numpy as np
 
@@ -276,7 +274,7 @@ class Interferometer(object):
         polarization_tensor = gwutils.get_polarization_tensor(ra, dec, time, psi, mode)
         return np.einsum('ij,ij->', self.geometry.detector_tensor, polarization_tensor)
 
-    def get_detector_response(self, waveform_polarizations, frequency_array, parameters):
+    def get_detector_response(self, frequency_array, waveform_polarizations, parameters):
         """ Get the detector response for a particular waveform
 
         Parameters
@@ -289,49 +287,19 @@ class Interferometer(object):
         Returns
         =======
         array_like: A 3x3 array representation of the detector response (signal observed in the interferometer)
-        """
-        # import inspect
-        # curframe = inspect.currentframe()
-        # calframe = inspect.getouterframes(curframe, 2)
-        # print('caller name:', calframe[1][3])
+        """ 
+        # Transform linear polarizations to circular polarizations
+        waveform_polarizations_circular = {}
+        waveform_polarizations_circular['left'] = (waveform_polarizations['plus'] - (waveform_polarizations['cross'] * 1j)) / np.sqrt(2)
+        waveform_polarizations_circular['right'] = (waveform_polarizations['plus'] + (waveform_polarizations['cross'] * 1j)) / np.sqrt(2)
 
-        # print("Original P&C:")
-        # print(waveform_polarizations['plus'].max())
-        # print(waveform_polarizations['cross'].max())    
+        # Apply amplitude birefringence modification
+        waveform_polarizations_circular['left'] *= np.exp((luminosity_distance_to_comoving_distance(parameters['luminosity_distance'])/1000) * parameters['kappa'] * (frequency_array / 100))
+        waveform_polarizations_circular['right'] *= np.exp(-1 * (luminosity_distance_to_comoving_distance(parameters['luminosity_distance'])/1000) * parameters['kappa'] * (frequency_array / 100)) 
 
-        waveform_polarizations_transform = {}
-        waveform_polarizations_transform['left'] = (waveform_polarizations['plus'] - (waveform_polarizations['cross'] * 1j)) / np.sqrt(2)
-        waveform_polarizations_transform['right'] = (waveform_polarizations['plus'] + (waveform_polarizations['cross'] * 1j)) / np.sqrt(2)
-
-        # print("Original L&R:")
-        # print(waveform_polarizations_transform['left'].max())
-        # print(waveform_polarizations_transform['right'].max())
-        # print("waveform_polarizations_transform['left'] size:", waveform_polarizations_transform['left'].size)
-        # print("waveform_polarizations_transform['right'] size:", waveform_polarizations_transform['right'].size)
-
-        # print("exp check:")
-        # print("Comoving Distance: ",luminosity_distance_to_comoving_distance(parameters['luminosity_distance']))
-        # print("kappa: ",parameters['kappa'])
-        # print("exp: ",np.exp(-2 * luminosity_distance_to_comoving_distance(parameters['luminosity_distance']) * parameters['kappa']))
-
-        # print(frequency_array)
-
-        waveform_polarizations_transform['left'] *= np.exp((luminosity_distance_to_comoving_distance(parameters['luminosity_distance'])/1000) * parameters['kappa'] * (frequency_array / 100))
-        waveform_polarizations_transform['right'] *= np.exp(-1 * (luminosity_distance_to_comoving_distance(parameters['luminosity_distance'])/1000) * parameters['kappa'] * (frequency_array / 100)) 
-        
-        # print("Edited L&R:")
-        # print(waveform_polarizations_transform['left'].max())
-        # print(waveform_polarizations_transform['right'].max())
-        # print("waveform_polarizations_transform['left'] size:", waveform_polarizations_transform['left'].size)
-        # print("waveform_polarizations_transform['right'] size:", waveform_polarizations_transform['right'].size)
-
-        waveform_polarizations['plus'] = ((waveform_polarizations_transform['left'] + waveform_polarizations_transform['right']) * np.sqrt(2)) / 2
-        waveform_polarizations['cross'] = ((waveform_polarizations_transform['right'] - waveform_polarizations_transform['left']) * np.sqrt(2)) / 2j
-
-        # print("Edited P&C:")
-        # print(waveform_polarizations['plus'].max())
-        # print(waveform_polarizations['cross'].max()) 
-        # print()
+        # Transform circular polarizations to linear polarizations
+        waveform_polarizations['plus'] = ((waveform_polarizations_circular['left'] + waveform_polarizations_circular['right']) * np.sqrt(2)) / 2
+        waveform_polarizations['cross'] = ((waveform_polarizations_circular['right'] - waveform_polarizations_circular['left']) * np.sqrt(2)) / 2j
 
         signal = {}
         for mode in waveform_polarizations.keys():
@@ -342,7 +310,6 @@ class Interferometer(object):
                 parameters['psi'], mode)
 
             signal[mode] = waveform_polarizations[mode] * det_response
-
         signal_ifo = sum(signal.values())
 
         signal_ifo *= self.strain_data.frequency_mask
